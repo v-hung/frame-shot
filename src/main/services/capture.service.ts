@@ -58,9 +58,7 @@ export class CaptureService {
   /**
    * Capture image based on mode
    */
-  private async captureImage(
-    params: CaptureExecuteParams
-  ): Promise<Electron.NativeImage | null> {
+  private async captureImage(params: CaptureExecuteParams): Promise<Electron.NativeImage | null> {
     switch (params.mode) {
       case 'fullscreen': {
         const display = params.display

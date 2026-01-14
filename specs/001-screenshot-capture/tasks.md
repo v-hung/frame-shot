@@ -21,10 +21,10 @@
 
 **Purpose**: Project initialization and type definitions
 
-- [X] T001 Create feature branch `001-screenshot-capture` from main
-- [X] T002 [P] Create type definitions in src/main/types/capture.types.ts
-- [X] T003 [P] Add date-fns dependency to package.json for timestamp generation
-- [X] T004 Verify `npm run typecheck` passes with zero errors
+- [x] T001 Create feature branch `001-screenshot-capture` from main
+- [x] T002 [P] Create type definitions in src/main/types/capture.types.ts
+- [x] T003 [P] Add date-fns dependency to package.json for timestamp generation
+- [x] T004 Verify `npm run typecheck` passes with zero errors
 
 **Validation**: Run `npm run typecheck` - must pass before proceeding to Phase 2
 
@@ -36,16 +36,16 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [X] T005 [P] Implement ScreenService in src/main/services/screen.service.ts
-- [X] T006 [P] Implement FileService in src/main/services/file.service.ts
-- [X] T007 Implement CaptureService core logic in src/main/services/capture.service.ts
-- [X] T008 [P] Create capture IPC handlers in src/main/handlers/capture.handlers.ts
-- [X] T009 [P] Register capture handlers in src/main/handlers/index.ts
-- [X] T010 [P] Expose capture API in src/preload/index.ts with contextBridge
-- [X] T011 [P] Add capture API type definitions to src/preload/index.d.ts
-- [X] T012 Create Zustand capture store in src/renderer/src/stores/captureStore.ts
-- [X] T013 [P] Implement capture utilities in src/main/utils/capture.utils.ts
-- [X] T014 Register global hotkeys in src/main/index.ts (Ctrl+Shift+1/2/3)
+- [x] T005 [P] Implement ScreenService in src/main/services/screen.service.ts
+- [x] T006 [P] Implement FileService in src/main/services/file.service.ts
+- [x] T007 Implement CaptureService core logic in src/main/services/capture.service.ts
+- [x] T008 [P] Create capture IPC handlers in src/main/handlers/capture.handlers.ts
+- [x] T009 [P] Register capture handlers in src/main/handlers/index.ts
+- [x] T010 [P] Expose capture API in src/preload/index.ts with contextBridge
+- [x] T011 [P] Add capture API type definitions to src/preload/index.d.ts
+- [x] T012 Create Zustand capture store in src/renderer/src/stores/captureStore.ts
+- [x] T013 [P] Implement capture utilities in src/main/utils/capture.utils.ts
+- [x] T014 Register global hotkeys in src/main/index.ts (Ctrl+Shift+1/2/3)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

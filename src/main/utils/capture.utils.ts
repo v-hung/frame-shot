@@ -8,10 +8,7 @@ import type { CaptureRegion } from '../types/capture.types'
 /**
  * Calculate scaled region coordinates for high-DPI displays
  */
-export function scaleRegionCoordinates(
-  region: CaptureRegion,
-  scaleFactor: number
-): CaptureRegion {
+export function scaleRegionCoordinates(region: CaptureRegion, scaleFactor: number): CaptureRegion {
   return {
     ...region,
     x: Math.round(region.x * scaleFactor),
@@ -60,16 +57,9 @@ export function normalizeRegion(
 /**
  * Check if a point is inside a region
  */
-export function isPointInRegion(
-  x: number,
-  y: number,
-  region: CaptureRegion
-): boolean {
+export function isPointInRegion(x: number, y: number, region: CaptureRegion): boolean {
   return (
-    x >= region.x &&
-    x <= region.x + region.width &&
-    y >= region.y &&
-    y <= region.y + region.height
+    x >= region.x && x <= region.x + region.width && y >= region.y && y <= region.y + region.height
   )
 }
 
