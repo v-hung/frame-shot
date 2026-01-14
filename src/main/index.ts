@@ -1,12 +1,14 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerHandlers } from './handlers'
 
+let mainWindow: BrowserWindow | null = null
+
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 700,
     show: false,
@@ -19,7 +21,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow?.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -37,6 +39,33 @@ function createWindow(): void {
 
   // Open DevTools
   // mainWindow.webContents.openDevTools()
+}
+
+/**
+ * Register global hotkeys for screenshot capture
+ * FR-001: System MUST provide three capture modes accessible via global hotkeys
+ */
+function registerGlobalHotkeys(): void {
+  // Ctrl+Shift+1: Region capture
+  globalShortcut.register('CommandOrControl+Shift+1', () => {
+    if (mainWindow) {
+      mainWindow.webContents.send('capture:trigger', { mode: 'region' })
+    }
+  })
+
+  // Ctrl+Shift+2: Full screen capture
+  globalShortcut.register('CommandOrControl+Shift+2', () => {
+    if (mainWindow) {
+      mainWindow.webContents.send('capture:trigger', { mode: 'fullscreen' })
+    }
+  })
+
+  // Ctrl+Shift+3: Window capture
+  globalShortcut.register('CommandOrControl+Shift+3', () => {
+    if (mainWindow) {
+      mainWindow.webContents.send('capture:trigger', { mode: 'window' })
+    }
+  })
 }
 
 // This method will be called when Electron has finished
@@ -59,6 +88,9 @@ app.whenReady().then(() => {
   // Register IPC handlers
   registerHandlers()
 
+  // Register global hotkeys
+  registerGlobalHotkeys()
+
   createWindow()
 
   app.on('activate', function () {
@@ -72,6 +104,9 @@ app.whenReady().then(() => {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
+  // Unregister all global shortcuts
+  globalShortcut.unregisterAll()
+
   if (process.platform !== 'darwin') {
     app.quit()
   }
