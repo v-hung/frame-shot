@@ -52,6 +52,7 @@
    - **Workaround:** Add `// eslint-disable-next-line` comment or add minimal implementation
 
 4. **Formatting:**
+
    ```bash
    npm run format
    ```
@@ -170,7 +171,7 @@ src/
 - `.prettierrc.yaml` - Prettier configuration
 - `drizzle.config.ts` - Database ORM configuration
 - `components.json` - shadcn/ui configuration
-- `.gitignore` - Ignores: node_modules, dist, out, .eslintcache, _.log_, \*.env
+- `.gitignore` - Ignores: node*modules, dist, out, .eslintcache, *.log\_, \*.env
 
 ### Key Architectural Patterns
 
@@ -277,6 +278,13 @@ npm run dev  # Verify app starts and UI loads
 # 5. Test production build (optional but recommended)
 npm run build:unpack  # Faster than full build
 ```
+
+**Constitution Compliance**: All changes must comply with `.specify/memory/constitution.md` v1.0.0 principles:
+
+- Type Safety & Code Quality (zero type errors, ≥95% type coverage, ESLint compliant)
+- Testing Standards (unit tests for utilities/stores/services, integration tests for IPC/database)
+- User Experience Consistency (shadcn/ui components, CSS variables, loading states)
+- Performance Requirements (startup <3s, capture <200ms, memory <150MB idle)
 
 ## Critical Rules
 
