@@ -299,6 +299,208 @@ npm run build:unpack  # Faster than full build
 9. **ALWAYS** use `@renderer/*` alias for renderer imports (not relative paths)
 10. **TRUST THESE INSTRUCTIONS** - Only search if information is incomplete or incorrect
 
+## Capture Feature Implementation Patterns
+
+### IPC Communication Pattern
+
+**Handler Registration** (src/main/handlers/capture.handlers.ts):
+
+```typescript
+import { ipcMain } from 'electron'
+import { CaptureService } from '../services/capture.service'
+
+export function registerCaptureHandlers(): void {
+  const captureService = new CaptureService()
+
+  ipcMain.handle('capture:execute', async (_, params) => {
+    return await captureService.execute(params)
+  })
+
+  ipcMain.handle('capture:list-windows', async () => {
+    return await windowService.listWindows()
+  })
+}
+```
+
+**Preload Bridge** (src/preload/index.ts):
+
+```typescript
+const captureAPI = {
+  execute: (params) => ipcRenderer.invoke('capture:execute', params),
+  listWindows: () => ipcRenderer.invoke('capture:list-windows'),
+  onHotkeyTriggered: (callback) => {
+    ipcRenderer.on('capture:trigger', (_, mode) => callback(mode))
+  }
+}
+
+contextBridge.exposeInMainWorld('captureAPI', captureAPI)
+```
+
+**Renderer Usage** (React components):
+
+```typescript
+const { executeCapture } = useCaptureStore()
+
+useEffect(() => {
+  window.captureAPI.onHotkeyTriggered((mode) => {
+    startCapture(mode)
+  })
+}, [])
+```
+
+### Global Hotkeys Registration
+
+**Main Process** (src/main/index.ts):
+
+```typescript
+import { globalShortcut, BrowserWindow } from 'electron'
+
+function registerHotkeys(mainWindow: BrowserWindow): void {
+  globalShortcut.register('CommandOrControl+Shift+1', () => {
+    mainWindow.webContents.send('capture:trigger', 'region')
+  })
+
+  globalShortcut.register('CommandOrControl+Shift+2', () => {
+    mainWindow.webContents.send('capture:trigger', 'fullscreen')
+  })
+
+  globalShortcut.register('CommandOrControl+Shift+3', () => {
+    mainWindow.webContents.send('capture:trigger', 'window')
+  })
+}
+
+app.on('will-quit', () => globalShortcut.unregisterAll())
+```
+
+### Capture Service Architecture
+
+**Service Layer** (src/main/services/capture.service.ts):
+
+- **CaptureService**: Orchestrator - executes capture, manages clipboard, shows notifications
+- **ScreenService**: Display enumeration, region/fullscreen capture via desktopCapturer
+- **WindowService**: Window enumeration and capture
+- **FileService**: Save with timestamp naming and collision handling (\_N suffix)
+
+**Key Patterns**:
+
+- Parallel clipboard + file save with `Promise.all()` (FR-010 performance)
+- Timeout handling (500ms) with `Promise.race()`
+- Permission error detection (includes 'permission', 'denied', 'not authorized')
+- Large capture validation (max 16384x16384px)
+- DPI scaling: `scaledCoord = coord * scaleFactor` for multi-monitor
+
+### UI State Management (Zustand)
+
+**Capture Store** (src/renderer/src/stores/captureStore.ts):
+
+```typescript
+interface CaptureState {
+  isActive: boolean
+  mode: 'region' | 'fullscreen' | 'window' | null
+  currentRegion: CaptureRegion | null
+
+  startCapture: (mode) => void
+  setRegion: (region) => void
+  executeCapture: () => Promise<void>
+  cancelCapture: () => void
+}
+
+export const useCaptureStore = create<CaptureState>((set, get) => ({
+  // ... implementation
+}))
+```
+
+**Usage in Components**:
+
+- `CaptureOverlay`: Root container, listens for ESC/Enter, routes to mode-specific UI
+- `RegionSelector`: Mouse drag + arrow key nudging (1px default, 10px with Shift)
+- `WindowPicker`: Grid with thumbnails, click to capture
+
+### Error Handling Patterns
+
+**CaptureService Error Responses**:
+
+```typescript
+// Permission denied
+if (errorMessage.includes('permission')) {
+  return {
+    success: false,
+    error: 'Screen recording permission denied. Please grant permission in System Settings...'
+  }
+}
+
+// Timeout
+const capturePromise = this.captureImage(params)
+const timeoutPromise = new Promise((_, reject) =>
+  setTimeout(() => reject(new Error('Capture timeout (>500ms)')), 500)
+)
+const image = await Promise.race([capturePromise, timeoutPromise])
+
+// Large captures
+if (width > 16384 || height > 16384) {
+  return {
+    success: false,
+    error: 'Capture area too large. Maximum size is 16384x16384 pixels.'
+  }
+}
+```
+
+### File Naming & Collision Handling
+
+**FileService Pattern** (src/main/services/file.service.ts):
+
+```typescript
+async saveImage(buffer: Buffer, customFilename?: string): Promise<string> {
+  let filename = customFilename || this.generateTimestampFilename() // YYYY-MM-DD_HH-MM-SS.png
+  let fullPath = path.join(this.defaultSaveLocation, filename)
+
+  // Handle collisions with _N suffix
+  let counter = 1
+  while (await this.fileExists(fullPath)) {
+    const basename = path.basename(filename, '.png')
+    filename = `${basename}_${counter}.png`
+    fullPath = path.join(this.defaultSaveLocation, filename)
+    counter++
+  }
+
+  await fs.writeFile(fullPath, buffer)
+  return fullPath
+}
+```
+
+### React Effect Patterns (Avoiding Warnings)
+
+**Deferred setState** (avoid react-hooks/set-state-in-effect):
+
+```typescript
+useEffect(() => {
+  if (condition) {
+    const timer = setTimeout(() => {
+      setShowFlash(true)
+      executeCapture()
+    }, 0)
+    return () => clearTimeout(timer)
+  }
+  return undefined // Return undefined when condition false
+}, [dependencies])
+```
+
+**Keyboard Event Handling**:
+
+```typescript
+useEffect(() => {
+  if (!isActive) return
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') cancelCapture()
+    if (e.key === 'Enter') executeCapture()
+  }
+
+  window.addEventListener('keydown', handleKeyDown)
+  return () => window.removeEventListener('keydown', handleKeyDown)
+}, [isActive, cancelCapture, executeCapture])
+```
+
 ## No CI/CD Pipeline
 
 This project currently has **no automated CI/CD workflows**. All validation must be done locally before committing:

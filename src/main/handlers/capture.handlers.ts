@@ -3,13 +3,15 @@
  * Handles IPC communication for screenshot capture operations
  */
 
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 import { CaptureService } from '../services/capture.service'
 import { ScreenService } from '../services/screen.service'
+import { WindowService } from '../services/window.service'
 import type { CaptureExecuteParams } from '../types/capture.types'
 
 const captureService = new CaptureService()
 const screenService = new ScreenService()
+const windowService = new WindowService()
 
 /**
  * Register all capture-related IPC handlers
@@ -37,11 +39,29 @@ export function registerCaptureHandlers(): void {
     }
   })
 
-  // Execute capture
-  ipcMain.handle('capture:execute', async (_, params: CaptureExecuteParams) => {
-    return captureService.execute(params)
+  // List all capturable windows
+  ipcMain.handle('capture:list-windows', async (_, { includeMinimized = false }) => {
+    const windows = await windowService.listWindows(includeMinimized)
+    return { windows }
   })
 
-  // TODO: Add capture:list-windows for Phase 5 (User Story 3)
-  // TODO: Add capture:register-hotkeys for global hotkey management
+  // Execute capture
+  ipcMain.handle('capture:execute', async (event, params: CaptureExecuteParams) => {
+    console.log('[CaptureHandler] Execute capture with params:', params)
+
+    // Hide capture window IMMEDIATELY to prevent it appearing in screenshot
+    const captureWindow = BrowserWindow.getAllWindows().find((w) => w.webContents === event.sender)
+    if (captureWindow) {
+      captureWindow.hide()
+    }
+
+    // Short delay to ensure window is hidden
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    const result = await captureService.execute(params)
+
+    console.log('[CaptureHandler] Capture result:', result)
+
+    return result
+  })
 }

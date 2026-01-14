@@ -64,18 +64,51 @@ export class ScreenService {
    * Crop a region from a captured image
    * @param image The full screen capture
    * @param region The region to crop
+   * @param displayBounds Display bounds for scale calculation
    * @returns Cropped NativeImage
    */
-  captureRegion(image: Electron.NativeImage, region: CaptureRegion): Electron.NativeImage {
-    // Scale coordinates by DPI factor
-    const scaledRegion = {
-      x: Math.round(region.x * region.scaleFactor),
-      y: Math.round(region.y * region.scaleFactor),
-      width: Math.round(region.width * region.scaleFactor),
-      height: Math.round(region.height * region.scaleFactor)
+  captureRegion(
+    image: Electron.NativeImage,
+    region: CaptureRegion,
+    displayBounds: { width: number; height: number }
+  ): Electron.NativeImage {
+    const imageSize = image.getSize()
+    console.log('[ScreenService] Image size:', imageSize)
+    console.log('[ScreenService] Display bounds:', displayBounds)
+    console.log('[ScreenService] Region to crop:', region)
+
+    // Calculate scale factor from image size vs display size
+    // desktopCapturer returns HiDPI images (e.g., 3840x2160 for 1920x1080 display)
+    const scaleX = imageSize.width / displayBounds.width
+    const scaleY = imageSize.height / displayBounds.height
+
+    console.log('[ScreenService] Scale factors:', { scaleX, scaleY })
+
+    // Scale coordinates to match image resolution
+    const cropRect = {
+      x: Math.round(region.x * scaleX),
+      y: Math.round(region.y * scaleY),
+      width: Math.round(region.width * scaleX),
+      height: Math.round(region.height * scaleY)
     }
 
-    return image.crop(scaledRegion)
+    console.log('[ScreenService] Crop rect (scaled):', cropRect)
+
+    // Ensure crop rect is within image bounds
+    if (
+      cropRect.x < 0 ||
+      cropRect.y < 0 ||
+      cropRect.x + cropRect.width > imageSize.width ||
+      cropRect.y + cropRect.height > imageSize.height
+    ) {
+      console.warn('[ScreenService] Crop rect out of bounds, adjusting...')
+      cropRect.x = Math.max(0, cropRect.x)
+      cropRect.y = Math.max(0, cropRect.y)
+      cropRect.width = Math.min(cropRect.width, imageSize.width - cropRect.x)
+      cropRect.height = Math.min(cropRect.height, imageSize.height - cropRect.y)
+    }
+
+    return image.crop(cropRect)
   }
 
   /**

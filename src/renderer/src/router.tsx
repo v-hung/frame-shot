@@ -1,14 +1,15 @@
 import { createHashRouter } from 'react-router'
 import ErrorBoundary from './pages/error/ErrorBoundary'
-import { RootLayout } from './layouts/RootLayout'
 
 const router = createHashRouter(
   [
     {
       errorElement: <ErrorBoundary />,
-      Component: RootLayout,
       children: [
-        {},
+        {
+          path: '/',
+          lazy: () => import('./pages/home/HomePage')
+        },
         {
           path: '*',
           lazy: () => import('./pages/error/NotFoundPage')

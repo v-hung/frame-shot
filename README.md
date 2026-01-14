@@ -1,6 +1,58 @@
-# Project Brief - Screen Capture Application
+# FrameShot - Screen Capture Application
 
-## Project Goal
+**Version:** 1.0.0
+**Status:** In Development
+
+A lightweight, cross-platform desktop screenshot tool built with Electron, React, and TypeScript.
+
+## Features
+
+### Screenshot Capture Modes
+
+FrameShot supports three capture modes, each accessible via global hotkeys:
+
+#### 1. Region Capture (Ctrl+Shift+1 / Cmd+Shift+1)
+
+- **Interactive Selection**: Click and drag to select any rectangular area on your screen
+- **Live Dimensions**: Real-time width × height display while selecting
+- **Keyboard Controls**:
+  - **Arrow Keys**: Nudge selection by 1px (hold Shift for 10px)
+  - **Enter**: Confirm capture
+  - **Escape**: Cancel capture or clear current selection
+- **Visual Feedback**: Semi-transparent overlay with crosshair cursor for precision
+
+#### 2. Fullscreen Capture (Ctrl+Shift+2 / Cmd+Shift+2)
+
+- **Instant Capture**: Captures the entire screen of the monitor where your cursor is located
+- **Multi-Monitor**: Automatically detects and captures the active display
+- **No UI Interruption**: Executes immediately with flash animation feedback
+
+#### 3. Window Capture (Ctrl+Shift+3 / Cmd+Shift+3)
+
+- **Window Picker**: Grid view of all capturable windows with live thumbnails
+- **Smart Filtering**: Excludes FrameShot's own windows and minimized windows
+- **Click to Capture**: Select any window thumbnail to capture it at full resolution
+
+### Core Capabilities
+
+- **Clipboard Integration**: All captures automatically copied to clipboard (FR-010)
+- **File Auto-Save**: Screenshots saved to `~/Pictures/FrameShot` with timestamp naming (FR-004)
+  - Format: `YYYY-MM-DD_HH-MM-SS.png`
+  - Collision handling: Adds `_N` suffix if filename exists
+- **System Notifications**: Success notification with thumbnail and click-to-open file location (FR-007, FR-016)
+- **Flash Animation**: 200ms white flash confirms capture completion (FR-006)
+- **High DPI Support**: Handles mixed DPI multi-monitor setups (FR-009)
+
+### Technical Stack
+
+- **Runtime**: Electron 39.2.6 (Node.js ~20.x)
+- **Frontend**: React 19.2.1 with TypeScript 5.9.3
+- **Build**: electron-vite 5.0.0 (Vite 7.2.6)
+- **Styling**: Tailwind CSS 4.1.18
+- **State**: Zustand 5.0.9
+- **Date Handling**: date-fns 4.1.0
+
+## Project Goal (Original Brief)
 
 Build a cross-platform desktop application for screen capture and video recording, similar to Snagit. Target platforms: Windows, macOS, and Linux.
 
@@ -11,39 +63,89 @@ Build a cross-platform desktop application for screen capture and video recordin
 - Technical writers and educators
 - Business professionals for presentations and reports
 
-## Core Features Required
+## Planned Features (Future Roadmap)
 
-### 1. Screenshot Capture Modes
+### Additional Screenshot Modes
 
-**Full Screen Capture**
+## Quick Start
 
-- Capture entire screen or specific monitor (multi-monitor support)
-- Quick capture with minimal UI interruption
+### Installation (Development)
 
-**Window Capture**
+```bash
+# Install dependencies
+npm install
 
-- Capture specific application window
-- Show window picker with preview thumbnails
-- Auto-detect window boundaries
+# Run in development mode
+npm run dev
 
-**Region Capture**
+# Build for production
+npm run build:win  # Windows
+npm run build:mac  # macOS
+npm run build:linux  # Linux
+```
 
-- User draws rectangle to select area
-- Show dimensions while selecting
-- Crosshair cursor for precision
+### Usage
 
-**Scrolling Capture**
+**Global Hotkeys** (registered at startup):
 
-- Auto-scroll and capture long pages/documents
-- Stitch screenshots together seamlessly
-- Works in browsers and scrollable applications
+- **Ctrl+Shift+1** (Cmd+Shift+1 on macOS): Region Capture
+- **Ctrl+Shift+2** (Cmd+Shift+2 on macOS): Fullscreen Capture
+- **Ctrl+Shift+3** (Cmd+Shift+3 on macOS): Window Capture
 
-**Timed Capture**
+**Region Capture Workflow**:
 
-- Delay capture by X seconds (with countdown)
-- Useful for capturing menus, tooltips, hover states
+1. Press Ctrl+Shift+1
+2. Click and drag to select area
+3. Use arrow keys to fine-tune (Shift = 10px nudge)
+4. Press Enter to capture (or Escape to cancel)
+5. Image automatically copied to clipboard and saved to file
 
-### 2. Video Recording
+**Screenshots Folder**: `~/Pictures/FrameShot` (Windows/macOS/Linux)
+
+### Permissions (macOS)
+
+On first launch, macOS will prompt for **Screen Recording** permission. Grant access in:
+
+```
+System Settings → Privacy & Security → Screen Recording
+```
+
+Enable FrameShot in the list and restart the app.
+
+## Architecture
+
+### Multi-Process Structure
+
+- **Main Process** (Node.js): Screen/window capture, file I/O, global hotkeys
+- **Renderer Process** (React): Capture overlay UI, user interactions
+- **Preload Bridge**: Secure IPC communication between main and renderer
+
+### Key Components
+
+**Main Process**:
+
+- `CaptureService`: Orchestrates capture operations (execute, clipboard, notifications)
+- `ScreenService`: Display enumeration, screen capture via desktopCapturer
+- `WindowService`: Window enumeration and capture
+- `FileService`: File save with collision handling
+- `capture.handlers.ts`: IPC request handlers
+
+**Renderer Process**:
+
+- `CaptureOverlay`: Root capture UI container
+- `RegionSelector`: Interactive rectangle selection
+- `WindowPicker`: Window selection grid
+- `captureStore` (Zustand): Capture state management
+
+**IPC Contracts**:
+
+- `capture:execute` - Execute capture operation
+- `capture:list-windows` - Get capturable windows
+- `capture:trigger` - Hotkey event notification
+
+## Future Roadmap (Not Implemented)
+
+### Video Recording
 
 **Screen Recording**
 

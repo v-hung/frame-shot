@@ -5,11 +5,13 @@
 
 import { clipboard, Notification } from 'electron'
 import { ScreenService } from './screen.service'
+import { WindowService } from './window.service'
 import { FileService } from './file.service'
 import type { CaptureExecuteParams, CaptureExecuteResponse, Display } from '../types/capture.types'
 
 export class CaptureService {
   private screenService = new ScreenService()
+  private windowService = new WindowService()
   private fileService = new FileService()
 
   /**
@@ -19,7 +21,27 @@ export class CaptureService {
    */
   async execute(params: CaptureExecuteParams): Promise<CaptureExecuteResponse> {
     try {
-      const image = await this.captureImage(params)
+      // T070: Validate capture dimensions
+      if (params.region) {
+        const { width, height } = params.region
+        if (width > 16384 || height > 16384) {
+          return {
+            success: false,
+            error: 'Capture area too large. Maximum size is 16384x16384 pixels.',
+            timestamp: new Date().toISOString(),
+            dimensions: { width, height }
+          }
+        }
+      }
+
+      // T069: Capture with timeout
+      const capturePromise = this.captureImage(params)
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Capture timeout (>500ms)')), 500)
+      )
+
+      const image = await Promise.race([capturePromise, timeoutPromise])
+
       if (!image) {
         return {
           success: false,
@@ -46,9 +68,18 @@ export class CaptureService {
         dimensions: image.getSize()
       }
     } catch (error) {
+      // T067: Permission denied error handling
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const isPermissionError =
+        errorMessage.includes('permission') ||
+        errorMessage.includes('denied') ||
+        errorMessage.includes('not authorized')
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: isPermissionError
+          ? 'Screen recording permission denied. Please grant permission in System Settings > Privacy & Security > Screen Recording.'
+          : errorMessage,
         timestamp: new Date().toISOString(),
         dimensions: { width: 0, height: 0 }
       }
@@ -77,12 +108,25 @@ export class CaptureService {
         const fullImage = await this.screenService.captureScreen(display.id)
         if (!fullImage) return null
 
-        return this.screenService.captureRegion(fullImage, params.region)
+        // Convert absolute coordinates to display-relative coordinates
+        const relativeRegion = {
+          ...params.region,
+          x: params.region.x - display.bounds.x,
+          y: params.region.y - display.bounds.y
+        }
+
+        console.log('[CaptureService] Convert coordinates:', {
+          absolute: { x: params.region.x, y: params.region.y },
+          displayBounds: display.bounds,
+          relative: { x: relativeRegion.x, y: relativeRegion.y }
+        })
+
+        return this.screenService.captureRegion(fullImage, relativeRegion, display.bounds)
       }
 
       case 'window': {
-        // TODO: Implement in Phase 5 (User Story 3)
-        throw new Error('Window capture not yet implemented')
+        if (!params.window) return null
+        return this.windowService.captureWindow(params.window.id)
       }
     }
   }

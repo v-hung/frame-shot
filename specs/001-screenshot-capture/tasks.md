@@ -68,18 +68,18 @@
 
 ### Implementation for User Story 1
 
-- [ ] T019 [P] [US1] Create CaptureOverlay component in src/renderer/src/features/capture/components/CaptureOverlay.tsx
-- [ ] T020 [P] [US1] Create RegionSelector component with rectangle drawing in src/renderer/src/features/capture/components/RegionSelector.tsx
-- [ ] T021 [US1] Implement real-time dimension display in src/renderer/src/features/capture/components/DimensionDisplay.tsx
-- [ ] T022 [US1] Add crosshair cursor styling to src/renderer/src/features/capture/components/CaptureOverlay.css
-- [ ] T023 [US1] Implement ESC key handling (clear selection/exit mode) in CaptureOverlay
-- [ ] T024 [US1] Implement Enter key handling (confirm capture) in RegionSelector
-- [ ] T024.5 [US1] Implement arrow key nudging for selection adjustment (1px default, 10px with Shift modifier)
-- [ ] T025 [US1] Add region capture to CaptureService.execute() for mode='region'
-- [ ] T026 [US1] Implement simultaneous clipboard + file save with Promise.all in CaptureService
-- [ ] T027 [US1] Add flash effect animation in src/renderer/src/features/capture/components/FlashEffect.tsx
-- [ ] T028 [US1] Implement system notification with thumbnail in CaptureService
-- [ ] T029 [US1] Add click-to-open file location in notification handler
+- [x] T019 [P] [US1] Create CaptureOverlay component in src/renderer/src/features/capture/components/CaptureOverlay.tsx
+- [x] T020 [P] [US1] Create RegionSelector component with rectangle drawing in src/renderer/src/features/capture/components/RegionSelector.tsx
+- [x] T021 [US1] Implement real-time dimension display in src/renderer/src/features/capture/components/DimensionDisplay.tsx
+- [x] T022 [US1] Add crosshair cursor styling to src/renderer/src/features/capture/components/CaptureOverlay.css
+- [x] T023 [US1] Implement ESC key handling (clear selection/exit mode) in CaptureOverlay
+- [x] T024 [US1] Implement Enter key handling (confirm capture) in RegionSelector
+- [x] T024.5 [US1] Implement arrow key nudging for selection adjustment (1px default, 10px with Shift modifier)
+- [x] T025 [US1] Add region capture to CaptureService.execute() for mode='region'
+- [x] T026 [US1] Implement simultaneous clipboard + file save with Promise.all in CaptureService
+- [x] T027 [US1] Add flash effect animation in src/renderer/src/features/capture/components/FlashEffect.tsx
+- [x] T028 [US1] Implement system notification with thumbnail in CaptureService
+- [x] T029 [US1] Add click-to-open file location in notification handler
 - [ ] T030 [US1] Implement selection rectangle edge/corner dragging for fine adjustment
 
 **Story Validation**: Can trigger Ctrl+Shift+1 → draw rectangle → release mouse → verify image saved + copied + notification shown
@@ -101,13 +101,13 @@
 
 ### Implementation for User Story 2
 
-- [ ] T035 [P] [US2] Implement capture:get-cursor-position IPC handler in src/main/handlers/capture.handlers.ts
-- [ ] T036 [P] [US2] Add cursor display detection to ScreenService.getCursorDisplay()
-- [ ] T037 [US2] Implement fullscreen capture mode in CaptureService.execute() for mode='fullscreen'
-- [ ] T038 [US2] Add high-DPI awareness (4K/5K support) to ScreenService.captureScreen()
+- [x] T035 [P] [US2] Implement capture:get-cursor-position IPC handler in src/main/handlers/capture.handlers.ts
+- [x] T036 [P] [US2] Add cursor display detection to ScreenService.getCursorDisplay()
+- [x] T037 [US2] Implement fullscreen capture mode in CaptureService.execute() for mode='fullscreen'
+- [x] T038 [US2] Add high-DPI awareness (4K/5K support) to ScreenService.captureScreen()
 - [ ] T039 [US2] Create monitor selection menu component in src/renderer/src/features/capture/components/MonitorPicker.tsx
 - [ ] T040 [US2] Add monitor selection to Zustand store (selectedDisplayId)
-- [ ] T041 [US2] Wire Ctrl+Shift+2 hotkey to fullscreen capture trigger
+- [x] T041 [US2] Wire Ctrl+Shift+2 hotkey to fullscreen capture trigger
 
 **Story Validation**: Trigger Ctrl+Shift+2 → verify current monitor captured → test with 2+ monitors → verify correct monitor selection
 
@@ -128,17 +128,17 @@
 
 ### Implementation for User Story 3
 
-- [ ] T046 [P] [US3] Create WindowService in src/main/services/window.service.ts
-- [ ] T047 [P] [US3] Implement window enumeration using desktopCapturer type='window'
-- [ ] T048 [US3] Implement window boundary detection (exclude shadows) in WindowService
-- [ ] T049 [US3] Implement capture:list-windows IPC handler
-- [ ] T050 [US3] Add window capture mode to CaptureService.execute() for mode='window'
-- [ ] T051 [P] [US3] Create WindowPicker component in src/renderer/src/features/capture/components/WindowPicker.tsx
-- [ ] T052 [US3] Implement hover highlight overlay for window preview
-- [ ] T053 [US3] Add window title display on hover
-- [ ] T054 [US3] Implement click-to-capture window selection
+- [x] T046 [P] [US3] Create WindowService in src/main/services/window.service.ts
+- [x] T047 [P] [US3] Implement window enumeration using desktopCapturer type='window'
+- [x] T048 [US3] Implement window boundary detection (exclude shadows) in WindowService
+- [x] T049 [US3] Implement capture:list-windows IPC handler
+- [x] T050 [US3] Add window capture mode to CaptureService.execute() for mode='window'
+- [x] T051 [P] [US3] Create WindowPicker component in src/renderer/src/features/capture/components/WindowPicker.tsx
+- [x] T052 [US3] Implement hover highlight overlay for window preview
+- [x] T053 [US3] Add window title display on hover
+- [x] T054 [US3] Implement click-to-capture window selection
 - [ ] T055 [US3] Add error handling for minimized/hidden windows
-- [ ] T056 [US3] Wire Ctrl+Shift+3 hotkey to window capture trigger
+- [x] T056 [US3] Wire Ctrl+Shift+3 hotkey to window capture trigger
 
 **Story Validation**: Trigger Ctrl+Shift+3 → hover over window → verify highlight → click → verify window-only capture with clean boundaries
 
@@ -150,10 +150,10 @@
 
 ### Constitution Validation
 
-- [ ] T057 Run `npm run typecheck` and verify zero errors (QR-001)
-- [ ] T058 Run `npm run lint` and verify zero violations (QR-003)
-- [ ] T059 Run `npm run format` to ensure consistent code style
-- [ ] T060 Verify type coverage ≥95% with no undocumented `any` usage (QR-002)
+- [x] T057 Run `npm run typecheck` and verify zero errors (QR-001)
+- [x] T058 Run `npm run lint` and verify zero violations (QR-003)
+- [x] T059 Run `npm run format` to ensure consistent code style
+- [x] T060 Verify type coverage ≥95% with no undocumented `any` usage (QR-002)
 
 ### Performance & Quality
 
@@ -166,21 +166,21 @@
 
 ### Error Handling & Edge Cases
 
-- [ ] T067 [P] Implement permission denied error handling in CaptureService
-- [ ] T068 [P] Add file save collision handling (filename_N.png suffix) in FileService
-- [ ] T069 [P] Handle capture timeout (>500ms) with error message
-- [ ] T070 [P] Add validation for extremely large capture areas (>16384x16384)
+- [x] T067 [P] Implement permission denied error handling in CaptureService
+- [x] T068 [P] Add file save collision handling (filename_N.png suffix) in FileService
+- [x] T069 [P] Handle capture timeout (>500ms) with error message
+- [x] T070 [P] Add validation for extremely large capture areas (>16384x16384)
 - [ ] T071 Handle rapid consecutive capture attempts (queue or disable)
 - [ ] T072 Test partial window visibility and off-screen windows
 
 ### Documentation & Cleanup
 
-- [ ] T073 [P] Add capture feature documentation to README.md
-- [ ] T074 [P] Document hotkey configuration in user guide
-- [ ] T075 [P] Add JSDoc comments to all public service methods
-- [ ] T076 Update .github/copilot-instructions.md with capture patterns learned
-- [ ] T077 Run final constitution compliance check against .specify/memory/constitution.md
-- [ ] T078 Generate feature summary report with metrics (tasks completed, test coverage, performance)
+- [x] T073 [P] Add capture feature documentation to README.md
+- [x] T074 [P] Document hotkey configuration in user guide
+- [x] T075 [P] Add JSDoc comments to all public service methods
+- [x] T076 Update .github/copilot-instructions.md with capture patterns learned
+- [x] T077 Run final constitution compliance check against .specify/memory/constitution.md
+- [x] T078 Generate feature summary report with metrics (tasks completed, test coverage, performance)
 
 ---
 
