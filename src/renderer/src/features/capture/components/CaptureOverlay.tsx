@@ -9,6 +9,17 @@ import { RegionSelector } from './RegionSelector'
 import { FlashEffect } from './FlashEffect'
 import { CaptureRegion } from 'src/main/types/capture.types'
 import { desktopCapturer, screen } from 'electron'
+import * as logger from '@renderer/utils/logger.utils'
+
+interface WindowInfo {
+  hwnd: number
+  title: string
+  x: number
+  y: number
+  width: number
+  height: number
+  zIndex: number
+}
 
 export function CaptureOverlay() {
   const [currentRegion, setCurrentRegion] = useState<CaptureRegion | null>(null)
@@ -19,24 +30,30 @@ export function CaptureOverlay() {
     width: number
     height: number
   } | null>(null)
+  const [availableWindows, setAvailableWindows] = useState<WindowInfo[]>([])
 
-  console.log('[CaptureOverlay] Current region:', currentRegion)
+  logger.log('[CaptureOverlay] Mounted')
+  logger.log('[CaptureOverlay] Current region:', currentRegion)
+  logger.log('[CaptureOverlay] Available windows:', availableWindows.length)
 
-  // Listen for window bounds from main process
+  // Listen for window bounds from main process and fetch windows
   useEffect(() => {
     window.captureAPI.onWindowBounds?.((bounds) => {
-      console.log('[CaptureOverlay] Received window bounds:', bounds)
+      logger.log('[CaptureOverlay] Received window bounds:', bounds)
       setWindowBounds(bounds)
     })
+
+    // Fetch all windows ONCE when overlay opens
     ;(async () => {
-      const sources = await desktopCapturer.getSources({
-        types: ['window']
-        // thumbnailSize: { width: 3840, height: 2160 } // Full resolution
-      })
-
-      const displays = screen.getAllDisplays()
-
-      console.log('[CaptureOverlay] Available sources:', sources, displays)
+      try {
+        const windowsResult = await window.windowPickerAPI.listAll()
+        if (windowsResult.success && windowsResult.data) {
+          setAvailableWindows(windowsResult.data.windows)
+          logger.log('[CaptureOverlay] Fetched windows:', windowsResult.data.windows.length)
+        }
+      } catch (error) {
+        logger.error('[CaptureOverlay] Failed to fetch windows:', error)
+      }
     })()
 
     return () => {
@@ -109,9 +126,10 @@ export function CaptureOverlay() {
 
   return (
     <>
-      <div className="fixed inset-0 z-99999 bg-black/30 cursor-crosshair select-none overflow-hidden m-0 p-0">
+      <div className="fixed inset-0 z-99999 cursor-crosshair select-none overflow-hidden m-0 p-0">
         <RegionSelector
           windowBounds={windowBounds}
+          availableWindows={availableWindows}
           onRegionSelect={setCurrentRegion}
           currentRegion={currentRegion}
         />

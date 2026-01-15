@@ -7,6 +7,11 @@ import { registerHandlers } from './handlers'
 let mainWindow: BrowserWindow | null = null
 let captureWindow: BrowserWindow | null = null
 
+// Export getter for captureWindow (used by handlers)
+export function getCaptureWindow(): BrowserWindow | null {
+  return captureWindow
+}
+
 function createWindow(): void {
   // Create the browser window.
   mainWindow = new BrowserWindow({
@@ -40,7 +45,7 @@ function createWindow(): void {
   }
 
   // Open DevTools
-  // mainWindow.webContents.openDevTools()
+  mainWindow.webContents.openDevTools()
 }
 
 /**
@@ -153,7 +158,7 @@ function createCaptureWindow(): void {
   })
 
   // Open DevTools for debugging (optional)
-  captureWindow.webContents.openDevTools({ mode: 'detach' })
+  // captureWindow.webContents.openDevTools({ mode: 'detach' })
 }
 
 /**
@@ -263,7 +268,7 @@ app.whenReady().then(() => {
   ipcMain.on('ping', () => console.log('pong'))
 
   // Register IPC handlers
-  registerHandlers()
+  registerHandlers(() => captureWindow)
 
   // Register global hotkeys
   registerGlobalHotkeys()

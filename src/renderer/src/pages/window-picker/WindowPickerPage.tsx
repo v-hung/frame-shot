@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react'
+import * as logger from '@renderer/utils/logger.utils'
 
 interface WindowInfo {
   hwnd: number
@@ -59,7 +60,7 @@ export function Component() {
       const result = await window.windowPickerAPI.listAll()
 
       if (result.success && result.data) {
-        console.log('All windows:', result.data.windows)
+        logger.log('All windows:', result)
         alert(`Found ${result.data.windows.length} windows. Check console for details.`)
       } else {
         setError(result.error || 'Unknown error')

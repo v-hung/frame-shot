@@ -53,14 +53,33 @@ const captureAPI = {
   }
 }
 
-// Expose API to renderer
+// Logger API (separate from capture)
+const loggerAPI = {
+  log: (...args: any[]) => ipcRenderer.send('logger:log', 'log', ...args),
+  error: (...args: any[]) => ipcRenderer.send('logger:log', 'error', ...args),
+  warn: (...args: any[]) => ipcRenderer.send('logger:log', 'warn', ...args)
+}
+
+// Window Picker API for native window detection
+const windowPickerAPI = {
+  getAtCursor: () => ipcRenderer.invoke('window-picker:get-at-cursor'),
+  listAll: () => ipcRenderer.invoke('window-picker:list-all')
+}
+
+// Expose APIs to renderer
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('captureAPI', captureAPI)
+    contextBridge.exposeInMainWorld('loggerAPI', loggerAPI)
+    contextBridge.exposeInMainWorld('windowPickerAPI', windowPickerAPI)
   } catch (error) {
-    console.error('Failed to expose captureAPI:', error)
+    console.error('Failed to expose APIs:', error)
   }
 } else {
   // @ts-ignore (define in dts)
   window.captureAPI = captureAPI
+  // @ts-ignore (define in dts)
+  window.loggerAPI = loggerAPI
+  // @ts-ignore (define in dts)
+  window.windowPickerAPI = windowPickerAPI
 }

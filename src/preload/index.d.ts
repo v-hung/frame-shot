@@ -10,6 +10,21 @@ interface CaptureAPI {
   listDisplays: () => Promise<{ displays: Display[] }>
   listWindows: (includeMinimized?: boolean) => Promise<{ windows: CaptureWindow[] }>
   getCursorPosition: () => Promise<{ x: number; y: number; displayId: string }>
+  getWindowAtPosition: (
+    x: number,
+    y: number
+  ) => Promise<{
+    success: boolean
+    window?: {
+      hwnd: number
+      title: string
+      x: number
+      y: number
+      width: number
+      height: number
+    }
+    error?: string
+  }>
   execute: (params: CaptureExecuteParams) => Promise<CaptureExecuteResponse>
   // Capture window specific methods
   onCaptureMode?: (callback: (mode: string) => void) => void
@@ -27,6 +42,12 @@ interface CaptureAPI {
   ) => void
   closeCaptureWindow?: () => void
   removeListeners?: () => void
+}
+
+interface LoggerAPI {
+  log: (...args: any[]) => void
+  error: (...args: any[]) => void
+  warn: (...args: any[]) => void
 }
 
 interface WindowPickerAPI {
@@ -53,6 +74,7 @@ interface WindowPickerAPI {
         y: number
         width: number
         height: number
+        zIndex: number
       }>
     }
     error?: string
@@ -64,6 +86,7 @@ declare global {
     electron: ElectronAPI
     api: unknown
     captureAPI: CaptureAPI
+    loggerAPI: LoggerAPI
     windowPickerAPI: WindowPickerAPI
   }
 }

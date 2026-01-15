@@ -1,5 +1,5 @@
-appId: com.sdc.workreport
-productName: 'SDC Work Report'
+appId: com.viethung.frameshot
+productName: 'Frame Shot'
 directories:
   buildResources: build
 files:
@@ -17,7 +17,7 @@ extraResources:
     filter:
       - '**/*'
 win:
-  executableName: sdc-work-report
+  executableName: frame-shot
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -38,7 +38,7 @@ linux:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: viethung
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
