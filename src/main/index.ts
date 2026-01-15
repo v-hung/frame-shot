@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { registerHandlers } from './handlers'
 
 let mainWindow: BrowserWindow | null = null
+let captureWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   // Create the browser window.
@@ -12,15 +13,12 @@ function createWindow(): void {
     width: 1200,
     height: 700,
     show: false,
-    frame: false, // Remove window frame
-    transparent: true, // Transparent background
-    backgroundColor: '#00000000', // Fully transparent (ARGB)
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      backgroundThrottling: false // Keep animations smooth even when hidden
+      sandbox: false
+      // backgroundThrottling: false // Keep animations smooth even when hidden
     }
   })
 
@@ -46,11 +44,14 @@ function createWindow(): void {
 }
 
 /**
- * Switch main window to capture mode
- * Transforms window to full-screen transparent overlay covering all monitors
+ * Create capture window
+ * Full-screen transparent overlay for region selection
  */
-function enterCaptureMode(mode: string): void {
-  if (!mainWindow) return
+function createCaptureWindow(): void {
+  // Close existing capture window if any
+  if (captureWindow && !captureWindow.isDestroyed()) {
+    captureWindow.close()
+  }
 
   // Calculate bounds that cover all displays
   const allDisplays = screen.getAllDisplays()
@@ -65,6 +66,15 @@ function enterCaptureMode(mode: string): void {
     minY = Math.min(minY, y)
     maxX = Math.max(maxX, x + width)
     maxY = Math.max(maxY, y + height)
+
+    console.log(
+      '[Main] Display:',
+      display.id,
+      'bounds:',
+      display.bounds,
+      'workArea:',
+      display.workArea
+    )
   })
 
   const captureBounds = {
@@ -74,58 +84,135 @@ function enterCaptureMode(mode: string): void {
     height: maxY - minY
   }
 
-  console.log('[Main] Entering capture mode, bounds:', captureBounds)
+  console.log('[Main] Creating capture window, bounds:', captureBounds)
+  console.log('[Main] Total displays:', allDisplays.length)
 
-  // Transform window to capture mode
-  mainWindow.setResizable(true) // Must be resizable to change size
-  mainWindow.setBounds(captureBounds)
-  mainWindow.setAlwaysOnTop(true, 'screen-saver')
-  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-  mainWindow.setFullScreenable(false)
-  mainWindow.setResizable(false)
-  mainWindow.setIgnoreMouseEvents(false)
+  // Create capture window
+  captureWindow = new BrowserWindow({
+    ...captureBounds,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    closable: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    opacity: 0.9999999,
+    fullscreenable: false,
+    hasShadow: false,
+    enableLargerThanScreen: true,
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/capture.js'),
+      sandbox: false,
+      backgroundThrottling: false
+    }
+  })
 
-  const displays = allDisplays.map((d) => ({
-    id: d.id.toString(),
-    bounds: d.bounds,
-    scaleFactor: d.scaleFactor
-  }))
+  // Force set bounds again to ensure it covers all monitors
+  captureWindow.setBounds(captureBounds)
+  captureWindow.setResizable(false)
 
-  // Send capture trigger event to renderer
-  mainWindow.webContents.send('capture:trigger', mode)
-  mainWindow.webContents.send('capture:bounds', captureBounds)
-  mainWindow.webContents.send('capture:displays', displays)
+  // Set window level to screen-saver (above all other windows)
+  captureWindow.setAlwaysOnTop(true, 'screen-saver')
+  captureWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+  // Load capture HTML
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    captureWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/capture.html`)
+  } else {
+    captureWindow.loadFile(join(__dirname, '../renderer/capture.html'))
+  }
+
+  captureWindow.once('ready-to-show', () => {
+    if (!captureWindow) return
+
+    const displays = allDisplays.map((d) => ({
+      id: d.id.toString(),
+      bounds: d.bounds,
+      scaleFactor: d.scaleFactor
+    }))
+
+    // Send capture info to renderer (no mode needed - always region selection)
+    captureWindow.webContents.send('capture:bounds', captureBounds)
+    captureWindow.webContents.send('capture:displays', displays)
+
+    // Show window
+    captureWindow.show()
+    captureWindow.focus()
+
+    console.log('[Main] Capture window shown and focused')
+  })
+
+  captureWindow.on('closed', () => {
+    captureWindow = null
+    console.log('[Main] Capture window closed')
+  })
+
+  // Open DevTools for debugging (optional)
+  captureWindow.webContents.openDevTools({ mode: 'detach' })
 }
 
 /**
- * Exit capture mode and restore normal window
+ * Start capture mode
+ * Only region mode needs UI overlay, others execute directly
+ */
+function startCaptureMode(mode: string): void {
+  console.log('[Main] Starting capture mode:', mode)
+
+  if (mode === 'region') {
+    // Region mode needs overlay UI
+    createCaptureWindow()
+  } else if (mode === 'fullscreen' || mode === 'window') {
+    // Fullscreen and window modes execute directly
+    executeDirectCapture(mode)
+  }
+}
+
+/**
+ * Execute capture directly without UI
+ */
+async function executeDirectCapture(mode: 'fullscreen' | 'window'): Promise<void> {
+  try {
+    const { CaptureService } = await import('./services/capture.service')
+    const captureService = new CaptureService()
+
+    const result = await captureService.execute({
+      mode,
+      region: undefined,
+      window: undefined
+    })
+
+    if (result.success) {
+      console.log('[Main] Direct capture successful:', result.filePath)
+      // TODO: Show notification
+    } else {
+      console.error('[Main] Direct capture failed:', result.error)
+      // TODO: Show error notification
+    }
+  } catch (error) {
+    console.error('[Main] Direct capture error:', error)
+  }
+}
+
+/**
+ * Exit capture mode - close capture window
  */
 function exitCaptureMode(): void {
-  if (!mainWindow) return
-
   console.log('[Main] Exiting capture mode')
 
-  // Notify renderer to exit capture mode FIRST (before changing window)
-  mainWindow.webContents.send('capture:exit')
+  if (captureWindow && !captureWindow.isDestroyed()) {
+    captureWindow.close()
+  }
 
-  // Small delay to ensure renderer receives event before window transformation
-  setTimeout(() => {
-    if (!mainWindow) return
-
-    // Restore normal window properties
-    mainWindow.setAlwaysOnTop(false)
-    mainWindow.setVisibleOnAllWorkspaces(false)
-    mainWindow.setResizable(true)
-    mainWindow.setBounds({ x: 100, y: 100, width: 900, height: 670 })
-    mainWindow.center()
-    mainWindow.setResizable(false)
-
-    // Ensure window is visible and focused
+  // Focus back to main window
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show()
     mainWindow.focus()
-
-    console.log('[Main] Window restored and focused')
-  }, 50)
+  }
 }
 
 // Listen for capture completion/cancellation
@@ -140,17 +227,17 @@ ipcMain.on('capture:close', () => {
 function registerGlobalHotkeys(): void {
   // Ctrl+Shift+1: Region capture
   globalShortcut.register('CommandOrControl+Shift+1', () => {
-    enterCaptureMode('region')
+    startCaptureMode('region')
   })
 
   // Ctrl+Shift+2: Full screen capture
   globalShortcut.register('CommandOrControl+Shift+2', () => {
-    enterCaptureMode('fullscreen')
+    startCaptureMode('fullscreen')
   })
 
   // Ctrl+Shift+3: Window capture
   globalShortcut.register('CommandOrControl+Shift+3', () => {
-    enterCaptureMode('window')
+    startCaptureMode('window')
   })
 }
 

@@ -5,7 +5,7 @@ import type { CaptureExecuteParams } from '../main/types/capture.types'
 // Custom APIs for renderer
 const api = {}
 
-// Capture API for screenshot functionality
+// Capture API for screenshot functionality (for main window - minimal)
 const captureAPI = {
   listDisplays: () => ipcRenderer.invoke('capture:list-displays'),
 
@@ -14,58 +14,14 @@ const captureAPI = {
 
   getCursorPosition: () => ipcRenderer.invoke('capture:get-cursor-position'),
 
-  execute: (params: CaptureExecuteParams) => ipcRenderer.invoke('capture:execute', params),
+  execute: (params: CaptureExecuteParams) => ipcRenderer.invoke('capture:execute', params)
+}
 
-  // Event listeners for hotkeys
-  onHotkeyTriggered: (callback: (mode: string) => void) => {
-    ipcRenderer.on('capture:trigger', (_, mode) => {
-      console.log('[Preload] Received capture:trigger, mode:', mode)
-      callback(mode)
-    })
-  },
+// Window Picker API for native window detection
+const windowPickerAPI = {
+  getAtCursor: () => ipcRenderer.invoke('window-picker:get-at-cursor'),
 
-  onWindowBounds: (
-    callback: (bounds: { x: number; y: number; width: number; height: number }) => void
-  ) => {
-    ipcRenderer.on('capture:bounds', (_, bounds) => {
-      console.log('[Preload] Received capture:bounds:', bounds)
-      callback(bounds)
-    })
-  },
-
-  onDisplays: (
-    callback: (
-      displays: Array<{
-        id: string
-        bounds: { x: number; y: number; width: number; height: number }
-        scaleFactor: number
-      }>
-    ) => void
-  ) => {
-    ipcRenderer.on('capture:displays', (_, displays) => {
-      console.log('[Preload] Received capture:displays:', displays)
-      callback(displays)
-    })
-  },
-
-  onCaptureExit: (callback: () => void) => {
-    ipcRenderer.on('capture:exit', () => {
-      console.log('[Preload] Received capture:exit')
-      callback()
-    })
-  },
-
-  removeHotkeyListener: () => {
-    ipcRenderer.removeAllListeners('capture:trigger')
-    ipcRenderer.removeAllListeners('capture:exit')
-    ipcRenderer.removeAllListeners('capture:bounds')
-    ipcRenderer.removeAllListeners('capture:displays')
-  },
-
-  // Close capture window
-  closeCaptureWindow: () => {
-    ipcRenderer.send('capture:close')
-  }
+  listAll: () => ipcRenderer.invoke('window-picker:list-all')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
@@ -76,6 +32,7 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
     contextBridge.exposeInMainWorld('captureAPI', captureAPI)
+    contextBridge.exposeInMainWorld('windowPickerAPI', windowPickerAPI)
   } catch (error) {
     console.error(error)
   }
@@ -86,4 +43,6 @@ if (process.contextIsolated) {
   window.api = api
   // @ts-ignore (define in dts)
   window.captureAPI = captureAPI
+  // @ts-ignore (define in dts)
+  window.windowPickerAPI = windowPickerAPI
 }

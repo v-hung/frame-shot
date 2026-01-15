@@ -11,6 +11,10 @@ const router = createHashRouter(
           lazy: () => import('./pages/home/HomePage')
         },
         {
+          path: '/window-picker',
+          lazy: () => import('./pages/window-picker/WindowPickerPage')
+        },
+        {
           path: '*',
           lazy: () => import('./pages/error/NotFoundPage')
         }

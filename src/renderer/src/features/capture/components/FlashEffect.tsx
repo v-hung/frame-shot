@@ -26,16 +26,6 @@ export function FlashEffect({ onComplete }: FlashEffectProps) {
   if (!visible) return null
 
   return (
-    <div
-      className="capture-flash"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'white',
-        animation: 'flash 200ms ease-out',
-        pointerEvents: 'none',
-        zIndex: 99999
-      }}
-    />
+    <div className="fixed inset-0 bg-white pointer-events-none z-99999 animate-[flash_200ms_ease-out]" />
   )
 }

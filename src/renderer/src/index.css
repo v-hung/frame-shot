@@ -138,3 +138,13 @@
     height: 100%;
   }
 }
+
+/* Capture flash animation */
+@keyframes flash {
+  0% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+  }
+}

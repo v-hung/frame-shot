@@ -5,7 +5,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useCaptureStore } from '@renderer/stores/captureStore'
 import { DimensionDisplay } from './DimensionDisplay'
 
 interface Position {
@@ -13,8 +12,19 @@ interface Position {
   y: number
 }
 
+interface CaptureRegion {
+  x: number
+  y: number
+  width: number
+  height: number
+  displayId: string
+  scaleFactor: number
+}
+
 interface RegionSelectorProps {
   windowBounds: { width: number; height: number; x: number; y: number } | null
+  onRegionSelect: (region: CaptureRegion | null) => void
+  currentRegion: CaptureRegion | null
 }
 
 interface DisplayInfo {
@@ -23,8 +33,11 @@ interface DisplayInfo {
   scaleFactor: number
 }
 
-export function RegionSelector({ windowBounds }: RegionSelectorProps) {
-  const { setRegion, currentRegion, executeCapture } = useCaptureStore()
+export function RegionSelector({
+  windowBounds,
+  onRegionSelect,
+  currentRegion
+}: RegionSelectorProps) {
   const [isDrawing, setIsDrawing] = useState(false)
   const [startPos, setStartPos] = useState<Position | null>(null)
   const [endPos, setEndPos] = useState<Position | null>(null)
@@ -36,7 +49,7 @@ export function RegionSelector({ windowBounds }: RegionSelectorProps) {
 
   // Listen for display information
   useEffect(() => {
-    window.captureAPI.onDisplays((displayList) => {
+    window.captureAPI.onDisplays?.((displayList) => {
       console.log('[RegionSelector] Received displays:', displayList)
       setDisplays(displayList)
       if (displayList.length > 0) {
@@ -114,7 +127,7 @@ export function RegionSelector({ windowBounds }: RegionSelectorProps) {
 
     // Only set region if area is significant (>10x10 pixels)
     if (width > 10 && height > 10) {
-      setRegion({
+      onRegionSelect({
         x,
         y,
         width,
@@ -122,17 +135,12 @@ export function RegionSelector({ windowBounds }: RegionSelectorProps) {
         displayId,
         scaleFactor
       })
-
-      // Auto-execute capture after mouse release (FR-009)
-      setTimeout(() => {
-        executeCapture()
-      }, 50)
     } else {
       // Reset if selection too small
       setStartPos(null)
       setEndPos(null)
     }
-  }, [startPos, endPos, displayId, scaleFactor, setRegion, executeCapture])
+  }, [startPos, endPos, displayId, scaleFactor, onRegionSelect])
 
   // Arrow key nudging (T024.5: FR-009)
   useEffect(() => {
@@ -161,12 +169,12 @@ export function RegionSelector({ windowBounds }: RegionSelectorProps) {
       }
 
       e.preventDefault()
-      setRegion(newRegion)
+      onRegionSelect(newRegion)
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [currentRegion, setRegion])
+  }, [currentRegion, onRegionSelect])
 
   // Calculate rectangle dimensions for rendering
   const getSelectionStyle = (): React.CSSProperties => {
@@ -191,16 +199,15 @@ export function RegionSelector({ windowBounds }: RegionSelectorProps) {
 
   return (
     <div
-      className="region-selector"
+      className="fixed inset-0"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      style={{ position: 'fixed', inset: 0 }}
     >
       {(isDrawing || currentRegion) && (
         <>
           <div
-            className="region-selection"
+            className="absolute border-2 border-blue-500 bg-blue-500/10 shadow-[0_0_10px_rgba(59,130,246,0.5)] pointer-events-none z-[2]"
             style={currentRegion ? undefined : getSelectionStyle()}
           />
           <DimensionDisplay

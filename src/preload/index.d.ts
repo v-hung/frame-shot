@@ -11,12 +11,12 @@ interface CaptureAPI {
   listWindows: (includeMinimized?: boolean) => Promise<{ windows: CaptureWindow[] }>
   getCursorPosition: () => Promise<{ x: number; y: number; displayId: string }>
   execute: (params: CaptureExecuteParams) => Promise<CaptureExecuteResponse>
-  onHotkeyTriggered: (callback: (mode: string) => void) => void
-  removeHotkeyListener: () => void
-  onWindowBounds: (
+  // Capture window specific methods
+  onCaptureMode?: (callback: (mode: string) => void) => void
+  onWindowBounds?: (
     callback: (bounds: { x: number; y: number; width: number; height: number }) => void
   ) => void
-  onDisplays: (
+  onDisplays?: (
     callback: (
       displays: Array<{
         id: string
@@ -25,8 +25,38 @@ interface CaptureAPI {
       }>
     ) => void
   ) => void
-  onCaptureExit: (callback: () => void) => void
-  closeCaptureWindow: () => void
+  closeCaptureWindow?: () => void
+  removeListeners?: () => void
+}
+
+interface WindowPickerAPI {
+  getAtCursor: () => Promise<{
+    success: boolean
+    data?: {
+      hwnd: number
+      title: string
+      processName: string
+      bounds: { x: number; y: number; width: number; height: number }
+      cursor: { x: number; y: number }
+      isVisible: boolean
+    }
+    error?: string
+  }>
+
+  listAll: () => Promise<{
+    success: boolean
+    data?: {
+      windows: Array<{
+        hwnd: number
+        title: string
+        x: number
+        y: number
+        width: number
+        height: number
+      }>
+    }
+    error?: string
+  }>
 }
 
 declare global {
@@ -34,5 +64,6 @@ declare global {
     electron: ElectronAPI
     api: unknown
     captureAPI: CaptureAPI
+    windowPickerAPI: WindowPickerAPI
   }
 }

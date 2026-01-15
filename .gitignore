@@ -6,3 +6,9 @@ out
 *.log*
 *.env
 !.env.example
+
+# Native build artifacts
+native/**/build/
+native/**/*.o
+native/**/*.obj
+resources/bin/

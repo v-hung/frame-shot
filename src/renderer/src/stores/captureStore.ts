@@ -54,7 +54,7 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
       if (result.success) {
         // Success! Reset state and close capture window
         set({ isActive: false, mode: null, currentRegion: null })
-        window.captureAPI.closeCaptureWindow()
+        window.captureAPI.closeCaptureWindow?.()
       } else {
         console.error('Capture failed:', result.error)
       }

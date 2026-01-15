@@ -1,18 +1,17 @@
 /**
  * Capture Overlay Component
- * Full-screen overlay for screenshot capture UI
+ * Region selection overlay UI (standalone window)
  * Feature: 001-screenshot-capture (User Story 1)
  */
 
 import { useEffect, useState } from 'react'
-import { useCaptureStore } from '@renderer/stores/captureStore'
 import { RegionSelector } from './RegionSelector'
-import { WindowPicker } from './WindowPicker'
 import { FlashEffect } from './FlashEffect'
-import './CaptureOverlay.css'
+import { CaptureRegion } from 'src/main/types/capture.types'
+import { desktopCapturer, screen } from 'electron'
 
 export function CaptureOverlay() {
-  const { isActive, mode, cancelCapture, executeCapture, currentRegion } = useCaptureStore()
+  const [currentRegion, setCurrentRegion] = useState<CaptureRegion | null>(null)
   const [showFlash, setShowFlash] = useState(false)
   const [windowBounds, setWindowBounds] = useState<{
     x: number
@@ -21,41 +20,78 @@ export function CaptureOverlay() {
     height: number
   } | null>(null)
 
-  console.log('[CaptureOverlay] Render - isActive:', isActive, 'mode:', mode)
+  console.log('[CaptureOverlay] Current region:', currentRegion)
 
   // Listen for window bounds from main process
   useEffect(() => {
-    window.captureAPI.onWindowBounds((bounds) => {
+    window.captureAPI.onWindowBounds?.((bounds) => {
       console.log('[CaptureOverlay] Received window bounds:', bounds)
       setWindowBounds(bounds)
     })
+    ;(async () => {
+      const sources = await desktopCapturer.getSources({
+        types: ['window']
+        // thumbnailSize: { width: 3840, height: 2160 } // Full resolution
+      })
+
+      const displays = screen.getAllDisplays()
+
+      console.log('[CaptureOverlay] Available sources:', sources, displays)
+    })()
+
+    return () => {
+      window.captureAPI.removeListeners?.()
+    }
   }, [])
 
-  // Handle fullscreen capture immediately with flash
-  useEffect(() => {
-    if (isActive && mode === 'fullscreen') {
-      // Execute on next tick to avoid setState-in-effect warning
-      const timer = setTimeout(() => {
+  // Execute capture
+  const executeCapture = async () => {
+    if (!currentRegion) return
+
+    try {
+      const result = await window.captureAPI.execute({
+        mode: 'region',
+        region: currentRegion
+      })
+
+      console.log('[CaptureOverlay] Capture result:', result)
+
+      if (result.success) {
+        // Show flash effect
         setShowFlash(true)
-        executeCapture()
-      }, 0)
-      return () => clearTimeout(timer)
+        // Close capture window after flash
+        setTimeout(() => {
+          window.captureAPI.closeCaptureWindow?.()
+        }, 200)
+      } else {
+        console.error('Capture failed:', result.error)
+        // TODO: Show error message to user
+      }
+    } catch (error) {
+      console.error('Capture error:', error)
     }
-    return undefined
-  }, [isActive, mode, executeCapture])
+  }
 
+  // Cancel capture
+  const cancelCapture = () => {
+    setCurrentRegion(null)
+    window.captureAPI.closeCaptureWindow?.()
+  }
+
+  // Clear region selection
+  const clearRegion = () => {
+    setCurrentRegion(null)
+  }
+
+  // Keyboard shortcuts
   useEffect(() => {
-    if (!isActive) return
-
     const handleKeyDown = (e: KeyboardEvent) => {
       // ESC: Cancel capture or clear selection (FR-008)
       if (e.key === 'Escape') {
         if (currentRegion) {
-          useCaptureStore.getState().clearRegion()
+          clearRegion()
         } else {
           cancelCapture()
-          // Close the capture window
-          window.captureAPI.closeCaptureWindow()
         }
       }
 
@@ -68,21 +104,18 @@ export function CaptureOverlay() {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isActive, currentRegion, cancelCapture, executeCapture])
-
-  // Don't render anything if not active and no flash
-  if (!isActive && !showFlash) {
-    return null
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRegion])
 
   return (
     <>
-      {isActive && (
-        <div className="capture-overlay">
-          {mode === 'region' && <RegionSelector windowBounds={windowBounds} />}
-          {mode === 'window' && <WindowPicker />}
-        </div>
-      )}
+      <div className="fixed inset-0 z-99999 bg-black/30 cursor-crosshair select-none overflow-hidden m-0 p-0">
+        <RegionSelector
+          windowBounds={windowBounds}
+          onRegionSelect={setCurrentRegion}
+          currentRegion={currentRegion}
+        />
+      </div>
       {showFlash && <FlashEffect onComplete={() => setShowFlash(false)} />}
     </>
   )
