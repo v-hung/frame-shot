@@ -58,7 +58,9 @@ export function RegionSelector({
   const [scaleFactor, setScaleFactor] = useState<number>(1)
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [hoveredWindow, setHoveredWindow] = useState<WindowInfo | null>(null)
-  const [mousePos, setMousePos] = useState<Position>({ x: 0, y: 0 })
+  // const [mousePos, setMousePos] = useState<Position>({ x: 0, y: 0 })
+
+  const DRAG_THRESHOLD = 5 // pixels to move before entering drawing mode
 
   // Track mouse position and match with available windows (client-side)
   useEffect(() => {
@@ -68,7 +70,18 @@ export function RegionSelector({
       const absoluteX = e.clientX + offsetX
       const absoluteY = e.clientY + offsetY
 
-      setMousePos({ x: absoluteX, y: absoluteY })
+      // setMousePos({ x: absoluteX, y: absoluteY })
+
+      // Check if we should enter drawing mode (drag threshold exceeded)
+      if (startPos && !isDrawing) {
+        const distance = Math.sqrt(
+          Math.pow(absoluteX - startPos.x, 2) + Math.pow(absoluteY - startPos.y, 2)
+        )
+        if (distance > DRAG_THRESHOLD) {
+          setIsDrawing(true)
+          setEndPos({ x: absoluteX, y: absoluteY }) // Update endPos immediately when entering drawing mode
+        }
+      }
 
       // Update endPos if dragging (for realtime selection update)
       if (isDrawing && startPos) {
@@ -139,11 +152,46 @@ export function RegionSelector({
       const absoluteX = e.clientX + offsetX
       const absoluteY = e.clientY + offsetY
 
-      // If hovering over a window, capture it immediately (single click)
-      if (hoveredWindow) {
-        // logger.log('[RegionSelector] Click on window:', hoveredWindow.title)
+      // Clear current region when starting new interaction
+      if (currentRegion) {
+        onRegionSelect(null)
+      }
 
-        // Detect which display the window is on
+      // Reset old positions
+      setStartPos(null)
+      setEndPos(null)
+      setIsDrawing(false)
+
+      // Detect which display we're on
+      const display = getDisplayAtPoint(absoluteX, absoluteY)
+      if (display) {
+        setDisplayId(display.id)
+        setScaleFactor(display.scaleFactor)
+      }
+
+      // Only set start position, wait for mouseUp or drag to decide action
+      const pos = { x: absoluteX, y: absoluteY }
+      requestAnimationFrame(() => {
+        setStartPos(pos)
+        setEndPos(pos)
+      })
+    },
+    [windowBounds, getDisplayAtPoint, onRegionSelect, currentRegion]
+  )
+
+  const handleMouseUp = useCallback(() => {
+    if (!startPos || !displayId) return
+
+    // Calculate drag distance
+    const currentEndPos = endPos || startPos
+    const distance = Math.sqrt(
+      Math.pow(currentEndPos.x - startPos.x, 2) + Math.pow(currentEndPos.y - startPos.y, 2)
+    )
+
+    // If no significant drag (< threshold) - check if we should capture hovered window
+    if (distance < DRAG_THRESHOLD) {
+      // If hovering over a window, capture it
+      if (hoveredWindow) {
         const display = getDisplayAtPoint(hoveredWindow.x, hoveredWindow.y)
         if (display) {
           onRegionSelect({
@@ -155,48 +203,21 @@ export function RegionSelector({
             scaleFactor: display.scaleFactor
           })
         }
-        return
       }
+      // If not hovering window, just reset (no action)
+      setStartPos(null)
+      setEndPos(null)
+      setIsDrawing(false)
+      return
+    }
 
-      // Otherwise, start drawing region
-      setIsDrawing(true)
-
-      // Detect which display we're on
-      const display = getDisplayAtPoint(absoluteX, absoluteY)
-      if (display) {
-        setDisplayId(display.id)
-        setScaleFactor(display.scaleFactor)
-        // logger.log(
-        //   '[RegionSelector] Mouse on display:',
-        //   display.id,
-        //   'scaleFactor:',
-        //   display.scaleFactor
-        // )
-      }
-
-      const pos = { x: absoluteX, y: absoluteY }
-      // logger.log('[RegionSelector] Mouse down - client:', e.clientX, e.clientY, 'absolute:', pos)
-      setStartPos(pos)
-      setEndPos(pos)
-    },
-    [windowBounds, getDisplayAtPoint, hoveredWindow, onRegionSelect]
-  )
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    // Global mousemove already handles endPos update for realtime drawing
-    // This React event handler is kept for fallback but not needed
-  }, [])
-
-  const handleMouseUp = useCallback(() => {
-    if (!startPos || !endPos || !displayId) return
-
+    // Significant drag detected - capture the selected region
     setIsDrawing(false)
 
-    // Calculate region dimensions
-    const x = Math.min(startPos.x, endPos.x)
-    const y = Math.min(startPos.y, endPos.y)
-    const width = Math.abs(endPos.x - startPos.x)
-    const height = Math.abs(endPos.y - startPos.y)
+    const x = Math.min(startPos.x, currentEndPos.x)
+    const y = Math.min(startPos.y, currentEndPos.y)
+    const width = Math.abs(currentEndPos.x - startPos.x)
+    const height = Math.abs(currentEndPos.y - startPos.y)
 
     // Only set region if area is significant (>10x10 pixels)
     if (width > 10 && height > 10) {
@@ -213,85 +234,32 @@ export function RegionSelector({
       setStartPos(null)
       setEndPos(null)
     }
-  }, [startPos, endPos, displayId, scaleFactor, onRegionSelect])
-
-  // Arrow key nudging (T024.5: FR-009)
-  useEffect(() => {
-    if (!currentRegion) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const nudgeAmount = e.shiftKey ? 10 : 1 // 10px with Shift, 1px default
-
-      const newRegion = { ...currentRegion }
-
-      switch (e.key) {
-        case 'ArrowLeft':
-          newRegion.x -= nudgeAmount
-          break
-        case 'ArrowRight':
-          newRegion.x += nudgeAmount
-          break
-        case 'ArrowUp':
-          newRegion.y -= nudgeAmount
-          break
-        case 'ArrowDown':
-          newRegion.y += nudgeAmount
-          break
-        default:
-          return
-      }
-
-      e.preventDefault()
-      onRegionSelect(newRegion)
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [currentRegion, onRegionSelect])
-
-  // Calculate rectangle dimensions for rendering
-  const getSelectionStyle = (): React.CSSProperties => {
-    if (!startPos || !endPos) return {}
-
-    // Subtract window offset for rendering (coordinates are absolute, need to make them relative)
-    const offsetX = windowBounds?.x || 0
-    const offsetY = windowBounds?.y || 0
-
-    const x = Math.min(startPos.x, endPos.x) - offsetX
-    const y = Math.min(startPos.y, endPos.y) - offsetY
-    const width = Math.abs(endPos.x - startPos.x)
-    const height = Math.abs(endPos.y - startPos.y)
-
-    return {
-      left: `${x}px`,
-      top: `${y}px`,
-      width: `${width}px`,
-      height: `${height}px`
-    }
-  }
-
-  // Get window highlight style (relative to overlay bounds)
-  const getWindowHighlightStyle = (): React.CSSProperties | null => {
-    if (!hoveredWindow || isDrawing || currentRegion) return null
-
-    const offsetX = windowBounds?.x || 0
-    const offsetY = windowBounds?.y || 0
-
-    return {
-      left: `${hoveredWindow.x - offsetX}px`,
-      top: `${hoveredWindow.y - offsetY}px`,
-      width: `${hoveredWindow.width}px`,
-      height: `${hoveredWindow.height}px`
-    }
-  }
+  }, [startPos, endPos, displayId, scaleFactor, onRegionSelect, hoveredWindow, getDisplayAtPoint])
 
   // Calculate unified selector box style
   const getSelectorBoxStyle = (): React.CSSProperties => {
     const offsetX = windowBounds?.x || 0
     const offsetY = windowBounds?.y || 0
 
-    // Priority: hoveredWindow (not dragging) > currentRegion > dragging selection
-    if (hoveredWindow && !isDrawing && !currentRegion) {
+    // Priority: isDrawing (override currentRegion) > hoveredWindow > currentRegion
+
+    // Dragging - calculate from startPos and endPos (HIGHEST PRIORITY)
+    if (isDrawing && startPos && endPos) {
+      const x = Math.min(startPos.x, endPos.x) - offsetX
+      const y = Math.min(startPos.y, endPos.y) - offsetY
+      const width = Math.abs(endPos.x - startPos.x)
+      const height = Math.abs(endPos.y - startPos.y)
+
+      return {
+        left: `${x}px`,
+        top: `${y}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+        boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)'
+      }
+    }
+
+    if (hoveredWindow && !currentRegion) {
       return {
         left: `${hoveredWindow.x - offsetX}px`,
         top: `${hoveredWindow.y - offsetY}px`,
@@ -311,22 +279,6 @@ export function RegionSelector({
       }
     }
 
-    // Dragging - calculate from startPos and endPos
-    if (isDrawing && startPos && endPos) {
-      const x = Math.min(startPos.x, endPos.x) - offsetX
-      const y = Math.min(startPos.y, endPos.y) - offsetY
-      const width = Math.abs(endPos.x - startPos.x)
-      const height = Math.abs(endPos.y - startPos.y)
-
-      return {
-        left: `${x}px`,
-        top: `${y}px`,
-        width: `${width}px`,
-        height: `${height}px`,
-        boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)'
-      }
-    }
-
     return {}
   }
 
@@ -334,24 +286,19 @@ export function RegionSelector({
   const showSelector = Boolean(hoveredWindow || isDrawing || currentRegion)
 
   return (
-    <div
-      className="fixed inset-0"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-    >
+    <div className="fixed inset-0" onMouseDown={handleMouseDown} onMouseUp={handleMouseUp}>
       {/* Unified selection box - for both window hover and manual drag */}
       {showSelector && (
         <>
           <div
-            className="absolute pointer-events-none z-[2] transition-all duration-75"
+            className={`absolute pointer-events-none z-2 ${isDrawing ? '' : 'transition-all duration-75'}`}
             style={getSelectorBoxStyle()}
           />
 
           {/* Tooltip - only show when hovering window */}
           {hoveredWindow && !isDrawing && !currentRegion && (
             <div
-              className="absolute pointer-events-none z-[3]"
+              className="absolute pointer-events-none z-3"
               style={{
                 left: `${hoveredWindow.x - (windowBounds?.x || 0) + hoveredWindow.width / 2}px`,
                 top: `${hoveredWindow.y - (windowBounds?.y || 0)}px`,

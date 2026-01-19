@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { RegionSelector } from './RegionSelector'
 import { FlashEffect } from './FlashEffect'
 import { CaptureRegion } from 'src/main/types/capture.types'
-import { desktopCapturer, screen } from 'electron'
+// import { desktopCapturer, screen } from 'electron'
 import * as logger from '@renderer/utils/logger.utils'
 
 interface WindowInfo {
@@ -32,14 +32,9 @@ export function CaptureOverlay() {
   } | null>(null)
   const [availableWindows, setAvailableWindows] = useState<WindowInfo[]>([])
 
-  logger.log('[CaptureOverlay] Mounted')
-  logger.log('[CaptureOverlay] Current region:', currentRegion)
-  logger.log('[CaptureOverlay] Available windows:', availableWindows.length)
-
   // Listen for window bounds from main process and fetch windows
   useEffect(() => {
     window.captureAPI.onWindowBounds?.((bounds) => {
-      logger.log('[CaptureOverlay] Received window bounds:', bounds)
       setWindowBounds(bounds)
     })
 
@@ -49,7 +44,6 @@ export function CaptureOverlay() {
         const windowsResult = await window.windowPickerAPI.listAll()
         if (windowsResult.success && windowsResult.data) {
           setAvailableWindows(windowsResult.data.windows)
-          logger.log('[CaptureOverlay] Fetched windows:', windowsResult.data.windows.length)
         }
       } catch (error) {
         logger.error('[CaptureOverlay] Failed to fetch windows:', error)
@@ -62,24 +56,16 @@ export function CaptureOverlay() {
   }, [])
 
   // Execute capture
-  const executeCapture = async () => {
-    if (!currentRegion) return
-
+  const executeCapture = async (region: CaptureRegion) => {
     try {
       const result = await window.captureAPI.execute({
         mode: 'region',
-        region: currentRegion
+        region
       })
 
-      console.log('[CaptureOverlay] Capture result:', result)
-
       if (result.success) {
-        // Show flash effect
+        // Show flash effect - will auto-close window after animation
         setShowFlash(true)
-        // Close capture window after flash
-        setTimeout(() => {
-          window.captureAPI.closeCaptureWindow?.()
-        }, 200)
       } else {
         console.error('Capture failed:', result.error)
         // TODO: Show error message to user
@@ -103,7 +89,7 @@ export function CaptureOverlay() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // ESC: Cancel capture or clear selection (FR-008)
+      // ESC: Clear region or close overlay
       if (e.key === 'Escape') {
         if (currentRegion) {
           clearRegion()
@@ -111,17 +97,10 @@ export function CaptureOverlay() {
           cancelCapture()
         }
       }
-
-      // Enter: Confirm capture (FR-009)
-      if (e.key === 'Enter' && currentRegion) {
-        setShowFlash(true)
-        executeCapture()
-      }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRegion])
 
   return (
@@ -130,11 +109,25 @@ export function CaptureOverlay() {
         <RegionSelector
           windowBounds={windowBounds}
           availableWindows={availableWindows}
-          onRegionSelect={setCurrentRegion}
+          onRegionSelect={(region) => {
+            if (region) {
+              setCurrentRegion(region)
+              executeCapture(region)
+            } else {
+              setCurrentRegion(null)
+            }
+          }}
           currentRegion={currentRegion}
         />
       </div>
-      {showFlash && <FlashEffect onComplete={() => setShowFlash(false)} />}
+      {showFlash && (
+        <FlashEffect
+          onComplete={() => {
+            setShowFlash(false)
+            window.captureAPI.closeCaptureWindow?.()
+          }}
+        />
+      )}
     </>
   )
 }
