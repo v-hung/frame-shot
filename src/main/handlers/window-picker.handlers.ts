@@ -10,22 +10,6 @@ const nativeService = new NativeProcessService()
 
 export function registerWindowPickerHandlers(getCaptureWindow: () => BrowserWindow | null): void {
   /**
-   * Get window at cursor position
-   */
-  ipcMain.handle('window-picker:get-at-cursor', async () => {
-    try {
-      const result = await nativeService.getWindowAtCursor()
-      return result
-    } catch (error) {
-      console.error('[WindowPicker] Error getting window at cursor:', error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }
-    }
-  })
-
-  /**
    * List all visible windows
    */
   ipcMain.handle('window-picker:list-all', async () => {
@@ -37,13 +21,13 @@ export function registerWindowPickerHandlers(getCaptureWindow: () => BrowserWind
         const currentCaptureWindow = getCaptureWindow()
         const captureHwnd = currentCaptureWindow?.getNativeWindowHandle()?.readInt32LE(0)
 
-        console.log('[WindowPicker] Capture window HWND:', captureHwnd)
-        console.log('[WindowPicker] Total windows before filter:', result.data.windows.length)
+        // console.log('[WindowPicker] Capture window HWND:', captureHwnd)
+        // console.log('[WindowPicker] Total windows before filter:', result.data.windows.length)
 
         result.data.windows = result.data.windows.filter((win: any) => {
           // Exclude capture window by HWND
           if (captureHwnd && win.hwnd === captureHwnd) {
-            console.log('[WindowPicker] Filtering out capture window:', win.title, win.hwnd)
+            // console.log('[WindowPicker] Filtering out capture window:', win.title, win.hwnd)
             return false
           }
 
@@ -55,7 +39,10 @@ export function registerWindowPickerHandlers(getCaptureWindow: () => BrowserWind
           return true
         })
 
-        console.log('[WindowPicker] Windows after filter:', result.data.windows.length)
+        console.log(
+          '[WindowPicker] Windows after filter:',
+          JSON.stringify(result.data.windows, null, 2)
+        )
       }
 
       return result

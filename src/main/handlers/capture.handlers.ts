@@ -7,13 +7,11 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { CaptureService } from '../services/capture.service'
 import { ScreenService } from '../services/screen.service'
 import { WindowService } from '../services/window.service'
-import { NativeProcessService } from '../services/native-process.service'
 import type { CaptureExecuteParams } from '../types/capture.types'
 
 const captureService = new CaptureService()
 const screenService = new ScreenService()
 const windowService = new WindowService()
-const nativeService = new NativeProcessService()
 
 /**
  * Register all capture-related IPC handlers

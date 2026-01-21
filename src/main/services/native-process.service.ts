@@ -33,14 +33,6 @@ export class NativeProcessService {
   }
 
   /**
-   * Get window information at current cursor position
-   */
-  async getWindowAtCursor(): Promise<NativeProcessResult> {
-    const binaryPath = this.getBinaryPath('frameshot-native')
-    return this.spawnProcess(binaryPath, ['get-window-at-cursor'])
-  }
-
-  /**
    * List all visible windows
    */
   async listWindows(): Promise<NativeProcessResult> {
@@ -83,23 +75,26 @@ export class NativeProcessService {
    */
   private spawnProcess(binaryPath: string, args: string[]): Promise<NativeProcessResult> {
     return new Promise((resolve, reject) => {
-      console.log('[NativeProcess] Spawning:', binaryPath, args)
+      // console.log('[NativeProcess] Spawning:', binaryPath, args)
 
       const child: ChildProcess = spawn(binaryPath, args)
+
+      child.stdout?.setEncoding('utf8')
+      child.stderr?.setEncoding('utf8')
 
       let stdout = ''
       let stderr = ''
 
       child.stdout?.on('data', (data) => {
-        stdout += data.toString()
+        stdout += data.toString('utf8')
       })
 
       child.stderr?.on('data', (data) => {
-        stderr += data.toString()
+        stderr += data.toString('utf8')
       })
 
       child.on('close', (code) => {
-        console.log('[NativeProcess] Exit code:', code)
+        // console.log('[NativeProcess] Exit code:', code)
 
         if (code !== 0) {
           resolve({

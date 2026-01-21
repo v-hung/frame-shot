@@ -51,30 +51,22 @@ interface LoggerAPI {
 }
 
 interface WindowPickerAPI {
-  getAtCursor: () => Promise<{
-    success: boolean
-    data?: {
-      hwnd: number
-      title: string
-      processName: string
-      bounds: { x: number; y: number; width: number; height: number }
-      cursor: { x: number; y: number }
-      isVisible: boolean
-    }
-    error?: string
-  }>
-
   listAll: () => Promise<{
     success: boolean
     data?: {
       windows: Array<{
         hwnd: number
         title: string
+        processName: string
+        windowBounds: { x: number; y: number; width: number; height: number }
+        clientBounds: { x: number; y: number; width: number; height: number }
+        titleBarBounds: { x: number; y: number; width: number; height: number }
         x: number
         y: number
         width: number
         height: number
         zIndex: number
+        isVisible: boolean
       }>
     }
     error?: string

@@ -1,182 +1,141 @@
-/**
- * FrameShot Native Module
- * Windows API for window detection and screen capture
- */
-
 #include <iostream>
-#include <string>
 #include <vector>
+#include <string>
 #include <windows.h>
 #include <dwmapi.h>
-#include <sstream>
+#include <algorithm>
 
 #pragma comment(lib, "dwmapi.lib")
 
-/**
- * Get window at cursor position
- */
-void getWindowAtCursor() {
-    POINT cursorPos;
-    GetCursorPos(&cursorPos);
-
-    HWND hwnd = WindowFromPoint(cursorPos);
-
-    if (hwnd == NULL) {
-        std::cout << "{\"success\": false, \"error\": \"No window found at cursor position\"}";
-        return;
-    }
-
-    // Get root window (not child controls)
-    HWND rootHwnd = GetAncestor(hwnd, GA_ROOT);
-    if (rootHwnd != NULL) {
-        hwnd = rootHwnd;
-    }
-
-    // Get window title
-    char windowTitle[256] = {0};
-    GetWindowTextA(hwnd, windowTitle, sizeof(windowTitle));
-
-    // Get window rect
-    RECT rect;
-    GetWindowRect(hwnd, &rect);
-
-    // Get process name
-    DWORD processId;
-    GetWindowThreadProcessId(hwnd, &processId);
-
-    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
-    char processName[MAX_PATH] = "Unknown";
-    if (hProcess) {
-        DWORD size = MAX_PATH;
-        QueryFullProcessImageNameA(hProcess, 0, processName, &size);
-        CloseHandle(hProcess);
-
-        // Extract just the filename
-        char* filename = strrchr(processName, '\\');
-        if (filename) {
-            memmove(processName, filename + 1, strlen(filename));
-        }
-    }
-
-    // Check if window is visible
-    bool isVisible = IsWindowVisible(hwnd) != 0;
-
-    // Output JSON
-    std::cout << "{";
-    std::cout << "\"success\": true,";
-    std::cout << "\"hwnd\": " << reinterpret_cast<uintptr_t>(hwnd) << ",";
-    std::cout << "\"title\": \"" << windowTitle << "\",";
-    std::cout << "\"processName\": \"" << processName << "\",";
-    std::cout << "\"bounds\": {";
-    std::cout << "\"x\": " << rect.left << ",";
-    std::cout << "\"y\": " << rect.top << ",";
-    std::cout << "\"width\": " << (rect.right - rect.left) << ",";
-    std::cout << "\"height\": " << (rect.bottom - rect.top);
-    std::cout << "},";
-    std::cout << "\"cursor\": {";
-    std::cout << "\"x\": " << cursorPos.x << ",";
-    std::cout << "\"y\": " << cursorPos.y;
-    std::cout << "},";
-    std::cout << "\"isVisible\": " << (isVisible ? "true" : "false");
-    std::cout << "}" << std::endl;
-}
-
-/**
- * Struct to hold enumeration state
- */
-struct EnumWindowsState {
-    std::vector<std::string>* windows;
-    int zIndex;
+struct State {
+    std::vector<std::string> windowsJson;
+    HRGN hOccupiedRgn;
+    int screenH; // Chiều cao giới hạn (Taskbar/Monitor)
 };
 
-/**
- * Callback for EnumWindows
- * EnumWindows enumerates in Z-order (top-most first)
- */
+std::string WStringToString(const std::wstring& wstr) {
+    if (wstr.empty()) return "";
+    int size = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
+    std::string strTo(size, 0);
+    WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size, NULL, NULL);
+    return strTo;
+}
+
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
-    if (!IsWindowVisible(hwnd)) {
+    State* state = (State*)lParam;
+
+    if (!IsWindowVisible(hwnd) || IsIconic(hwnd)) return TRUE;
+
+    // 1. Lấy tọa độ thực (DWM) - Đây là tọa độ chuẩn xác nhất nhìn thấy trên màn hình
+    RECT wr;
+    if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &wr, sizeof(RECT)))) {
+        GetWindowRect(hwnd, &wr);
+    }
+
+    long x = wr.left;
+    long y = wr.top;
+    long w = wr.right - wr.left;
+    long h = wr.bottom - wr.top;
+
+    // 2. LOẠI BỎ PICKER (Nếu nó to bằng hoặc hơn màn hình hiện tại)
+    if (w >= GetSystemMetrics(SM_CXSCREEN) && h >= state->screenH) return TRUE;
+
+    // 3. Lọc tiêu đề
+    wchar_t titleW[256];
+    if (GetWindowTextW(hwnd, titleW, 256) <= 0) return TRUE;
+
+    // 4. Occlusion Culling
+    HRGN hCurRgn = CreateRectRgn(wr.left, wr.top, wr.right, wr.bottom);
+    HRGN hResultRgn = CreateRectRgn(0, 0, 0, 0);
+    if (CombineRgn(hResultRgn, hCurRgn, state->hOccupiedRgn, RGN_DIFF) == NULLREGION) {
+        DeleteObject(hCurRgn);
+        DeleteObject(hResultRgn);
         return TRUE;
     }
+    CombineRgn(state->hOccupiedRgn, state->hOccupiedRgn, hCurRgn, RGN_OR);
+    DeleteObject(hCurRgn);
+    DeleteObject(hResultRgn);
 
-    char windowTitle[256] = {0};
-    GetWindowTextA(hwnd, windowTitle, sizeof(windowTitle));
-
-    if (strlen(windowTitle) == 0) {
-        return TRUE;
+    // 5. Xử lý Process Name
+    DWORD pid;
+    GetWindowThreadProcessId(hwnd, &pid);
+    std::string procName = "unknown";
+    HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (hProc) {
+        wchar_t path[MAX_PATH];
+        DWORD sz = MAX_PATH;
+        if (QueryFullProcessImageNameW(hProc, 0, path, &sz)) {
+            std::wstring ws(path);
+            size_t pos = ws.find_last_of(L"\\");
+            procName = WStringToString(pos != std::wstring::npos ? ws.substr(pos + 1) : ws);
+        }
+        CloseHandle(hProc);
     }
 
-    // Get visible window bounds (excluding invisible borders)
-    RECT rect;
-    HRESULT hr = DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &rect, sizeof(RECT));
+    // 6. Tính toán đồng nhất Client & Window Bounds
+    // Ta sử dụng tọa độ Window làm gốc để tránh lệch pixel
+    long clientX = x;
+    long clientY = y;
+    long clientW = w;
+    long clientH = h;
 
-    // Fallback to GetWindowRect if DWM fails
-    if (FAILED(hr)) {
-        GetWindowRect(hwnd, &rect);
+    // Offset cho trình duyệt
+    std::string lowProc = procName;
+    std::transform(lowProc.begin(), lowProc.end(), lowProc.begin(), ::tolower);
+    if (lowProc.find("chrome") != std::string::npos || lowProc.find("msedge") != std::string::npos) {
+        UINT dpi = GetDpiForWindow(hwnd);
+        int offset = MulDiv(80, dpi, 96);
+        clientY += offset;
+        clientH -= offset;
     }
 
-    // Skip too small windows
-    if ((rect.right - rect.left) < 50 || (rect.bottom - rect.top) < 50) {
-        return TRUE;
+    // 7. LOGIC CẮT HEIGHT (Clipping)
+    // Nếu Y + H vượt quá giới hạn màn hình (thường là 1032 hoặc 1040)
+    if (y + h > state->screenH) {
+        h = state->screenH - y;
+    }
+    if (clientY + clientH > state->screenH) {
+        clientH = state->screenH - clientY;
     }
 
-    EnumWindowsState* state = reinterpret_cast<EnumWindowsState*>(lParam);
+    // Đảm bảo không bị số âm
+    if (h < 0) h = 0;
+    if (clientH < 0) clientH = 0;
 
-    std::stringstream ss;
-    ss << "{";
-    ss << "\"hwnd\": " << reinterpret_cast<uintptr_t>(hwnd) << ",";
-    ss << "\"title\": \"" << windowTitle << "\",";
-    ss << "\"x\": " << rect.left << ",";
-    ss << "\"y\": " << rect.top << ",";
-    ss << "\"width\": " << (rect.right - rect.left) << ",";
-    ss << "\"height\": " << (rect.bottom - rect.top) << ",";
-    ss << "\"zIndex\": " << state->zIndex;  // Higher = on top
-    ss << "}";
+    char buf[2048];
+    snprintf(buf, sizeof(buf),
+        "{\"hwnd\":%llu,\"title\":\"%s\",\"processName\":\"%s\","
+        "\"windowBounds\":{\"x\":%ld,\"y\":%ld,\"width\":%ld,\"height\":%ld},"
+        "\"clientBounds\":{\"x\":%ld,\"y\":%ld,\"width\":%ld,\"height\":%ld}}",
+        (unsigned long long)hwnd, WStringToString(titleW).c_str(), procName.c_str(),
+        x, y, w, h,
+        clientX, clientY, clientW, clientH);
 
-    state->windows->push_back(ss.str());
-    state->zIndex--;  // Decrement for next window (lower z-order)
-
+    state->windowsJson.push_back(buf);
     return TRUE;
 }
 
-/**
- * List all visible windows
- */
-void listWindows() {
-    std::vector<std::string> windows;
-    EnumWindowsState state;
-    state.windows = &windows;
-    state.zIndex = 10000;  // Start with high number (top-most window)
-
-    EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&state));
-
-    std::cout << "{\"success\": true, \"windows\": [";
-    for (size_t i = 0; i < windows.size(); i++) {
-        std::cout << windows[i];
-        if (i < windows.size() - 1) {
-            std::cout << ",";
-        }
-    }
-    std::cout << "]}" << std::endl;
-}
-
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cout << "{\"success\": false, \"error\": \"No command specified. Usage: frameshot-native <command>\"}";
-        return 1;
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
+    State state;
+    state.hOccupiedRgn = CreateRectRgn(0, 0, 0, 0);
+
+    // Lấy vùng làm việc thực tế (thường là 1032 trên màn hình 1080)
+    RECT workArea;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+    state.screenH = workArea.bottom;
+
+    if (argc >= 2 && std::string(argv[1]) == "list-windows") {
+        EnumWindows(EnumWindowsProc, (LPARAM)&state);
+
+        std::cout << "{\"success\":true,\"windows\":[";
+        for (size_t i = 0; i < state.windowsJson.size(); i++) {
+            std::cout << state.windowsJson[i] << (i == state.windowsJson.size() - 1 ? "" : ",");
+        }
+        std::cout << "]}" << std::endl;
     }
 
-    std::string command = argv[1];
-
-    if (command == "get-window-at-cursor") {
-        getWindowAtCursor();
-    }
-    else if (command == "list-windows") {
-        listWindows();
-    }
-    else {
-        std::cout << "{\"success\": false, \"error\": \"Unknown command: " << command << "\"}";
-        return 1;
-    }
-
+    DeleteObject(state.hOccupiedRgn);
     return 0;
 }

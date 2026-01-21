@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { DimensionDisplay } from './DimensionDisplay'
-import logger from '@renderer/utils/logger.utils'
 
 interface Position {
   x: number
@@ -25,11 +24,11 @@ interface CaptureRegion {
 interface WindowInfo {
   hwnd: number
   title: string
-  x: number
-  y: number
-  width: number
-  height: number
-  zIndex: number
+  processName: string
+  windowBounds: { x: number; y: number; width: number; height: number } // Full window including title bar
+  clientBounds: { x: number; y: number; width: number; height: number } // Content area only
+  titleBarBounds: { x: number; y: number; width: number; height: number } // Title bar area
+  isVisible: boolean
 }
 
 interface RegionSelectorProps {
@@ -58,19 +57,17 @@ export function RegionSelector({
   const [scaleFactor, setScaleFactor] = useState<number>(1)
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [hoveredWindow, setHoveredWindow] = useState<WindowInfo | null>(null)
-  // const [mousePos, setMousePos] = useState<Position>({ x: 0, y: 0 })
+  const [cursorRegion, setCursorRegion] = useState<'title-bar' | 'client' | 'outside'>('outside')
 
   const DRAG_THRESHOLD = 5 // pixels to move before entering drawing mode
 
-  // Track mouse position and match with available windows (client-side)
+  // Track mouse position and detect windows using native API
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       const offsetX = windowBounds?.x || 0
       const offsetY = windowBounds?.y || 0
       const absoluteX = e.clientX + offsetX
       const absoluteY = e.clientY + offsetY
-
-      // setMousePos({ x: absoluteX, y: absoluteY })
 
       // Check if we should enter drawing mode (drag threshold exceeded)
       if (startPos && !isDrawing) {
@@ -79,7 +76,7 @@ export function RegionSelector({
         )
         if (distance > DRAG_THRESHOLD) {
           setIsDrawing(true)
-          setEndPos({ x: absoluteX, y: absoluteY }) // Update endPos immediately when entering drawing mode
+          setEndPos({ x: absoluteX, y: absoluteY })
         }
       }
 
@@ -90,37 +87,62 @@ export function RegionSelector({
 
       // Only detect window when NOT drawing AND no current region
       if (!isDrawing && !currentRegion && availableWindows.length > 0) {
-        // Find all windows that contain this point
-        const matchedWindows = availableWindows.filter((win) => {
+        // Find window at cursor position (client-side detection)
+        const matchedWindow = availableWindows.find((win) => {
+          const wb = win.windowBounds
           return (
-            absoluteX >= win.x &&
-            absoluteX <= win.x + win.width &&
-            absoluteY >= win.y &&
-            absoluteY <= win.y + win.height
+            absoluteX >= wb.x &&
+            absoluteX <= wb.x + wb.width &&
+            absoluteY >= wb.y &&
+            absoluteY <= wb.y + wb.height
           )
         })
 
-        // If multiple windows overlap, sort by zIndex to get the top-most one
-        // Higher zIndex = on top
-        if (matchedWindows.length > 0) {
-          matchedWindows.sort((a, b) => b.zIndex - a.zIndex)
-          setHoveredWindow(matchedWindows[0])
+        if (matchedWindow) {
+          setHoveredWindow(matchedWindow)
+
+          // Detect which region cursor is in
+          const client = matchedWindow.clientBounds
+          const windowBounds = matchedWindow.windowBounds
+
+          // Check client area FIRST (more precise - actual content area)
+          if (
+            absoluteX >= client.x &&
+            absoluteX <= client.x + client.width &&
+            absoluteY >= client.y &&
+            absoluteY <= client.y + client.height
+          ) {
+            setCursorRegion('client')
+          }
+          // If inside window but not in client area, it's title bar (includes tabs, address bar, etc)
+          else if (
+            absoluteX >= windowBounds.x &&
+            absoluteX <= windowBounds.x + windowBounds.width &&
+            absoluteY >= windowBounds.y &&
+            absoluteY <= windowBounds.y + windowBounds.height
+          ) {
+            setCursorRegion('title-bar')
+          } else {
+            setCursorRegion('outside')
+          }
         } else {
           setHoveredWindow(null)
+          setCursorRegion('outside')
         }
       } else {
         setHoveredWindow(null)
+        setCursorRegion('outside')
       }
     }
 
     window.addEventListener('mousemove', handleGlobalMouseMove)
     return () => window.removeEventListener('mousemove', handleGlobalMouseMove)
-  }, [windowBounds, availableWindows, isDrawing, currentRegion, startPos])
+  }, [windowBounds, isDrawing, currentRegion, startPos, availableWindows])
 
   // Listen for display information
   useEffect(() => {
     window.captureAPI.onDisplays?.((displayList) => {
-      logger.log('[RegionSelector] Received displays:', displayList)
+      // logger.log('[RegionSelector] Received displays:', displayList)
       setDisplays(displayList)
       if (displayList.length > 0) {
         setDisplayId(displayList[0].id)
@@ -192,13 +214,24 @@ export function RegionSelector({
     if (distance < DRAG_THRESHOLD) {
       // If hovering over a window, capture it
       if (hoveredWindow) {
-        const display = getDisplayAtPoint(hoveredWindow.x, hoveredWindow.y)
+        // Determine which bounds to use based on cursor region
+        let bounds = hoveredWindow.windowBounds // Default to full window
+
+        if (cursorRegion === 'client') {
+          // Cursor in client area - capture content only
+          bounds = hoveredWindow.clientBounds
+        } else if (cursorRegion === 'title-bar') {
+          // Cursor in title bar - capture full window
+          bounds = hoveredWindow.windowBounds
+        }
+
+        const display = getDisplayAtPoint(bounds.x, bounds.y)
         if (display) {
           onRegionSelect({
-            x: hoveredWindow.x,
-            y: hoveredWindow.y,
-            width: hoveredWindow.width,
-            height: hoveredWindow.height,
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
             displayId: display.id,
             scaleFactor: display.scaleFactor
           })
@@ -208,6 +241,7 @@ export function RegionSelector({
       setStartPos(null)
       setEndPos(null)
       setIsDrawing(false)
+      setCursorRegion('outside')
       return
     }
 
@@ -234,7 +268,16 @@ export function RegionSelector({
       setStartPos(null)
       setEndPos(null)
     }
-  }, [startPos, endPos, displayId, scaleFactor, onRegionSelect, hoveredWindow, getDisplayAtPoint])
+  }, [
+    startPos,
+    endPos,
+    displayId,
+    scaleFactor,
+    onRegionSelect,
+    hoveredWindow,
+    cursorRegion,
+    getDisplayAtPoint
+  ])
 
   // Calculate unified selector box style
   const getSelectorBoxStyle = (): React.CSSProperties => {
@@ -260,11 +303,22 @@ export function RegionSelector({
     }
 
     if (hoveredWindow && !currentRegion) {
+      // Show different highlight based on cursor region
+      let bounds = hoveredWindow.windowBounds // Default to full window
+
+      if (cursorRegion === 'client') {
+        // Highlight client area only
+        bounds = hoveredWindow.clientBounds
+      } else if (cursorRegion === 'title-bar') {
+        // Highlight full window
+        bounds = hoveredWindow.windowBounds
+      }
+
       return {
-        left: `${hoveredWindow.x - offsetX}px`,
-        top: `${hoveredWindow.y - offsetY}px`,
-        width: `${hoveredWindow.width}px`,
-        height: `${hoveredWindow.height}px`,
+        left: `${bounds.x - offsetX}px`,
+        top: `${bounds.y - offsetY}px`,
+        width: `${bounds.width}px`,
+        height: `${bounds.height}px`,
         boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)'
       }
     }
@@ -300,23 +354,37 @@ export function RegionSelector({
             <div
               className="absolute pointer-events-none z-3"
               style={{
-                left: `${hoveredWindow.x - (windowBounds?.x || 0) + hoveredWindow.width / 2}px`,
-                top: `${hoveredWindow.y - (windowBounds?.y || 0)}px`,
+                left: `${hoveredWindow.windowBounds.x - (windowBounds?.x || 0) + hoveredWindow.windowBounds.width / 2}px`,
+                top: `${hoveredWindow.windowBounds.y - (windowBounds?.y || 0)}px`,
                 transform: 'translate(-50%, calc(-100% - 1rem))'
               }}
             >
               <div className="rounded-xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-black/5 dark:border-white/10 shadow-lg shadow-black/10 px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 min-w-50">
-                <div className="font-medium leading-snug truncate">
+                <div className="font-medium leading-snug truncate max-w-sm">
                   {hoveredWindow.title || '(No title)'}
                 </div>
-                <div className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-                  <span>
-                    {hoveredWindow.width} × {hoveredWindow.height}
-                  </span>
-                  <span className="opacity-40">•</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-medium">
+                <div className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {cursorRegion === 'client'
+                        ? `${hoveredWindow.clientBounds.width} × ${hoveredWindow.clientBounds.height}`
+                        : `${hoveredWindow.windowBounds.width} × ${hoveredWindow.windowBounds.height}`}
+                    </span>
+                    <span className="opacity-40">•</span>
+                    {cursorRegion === 'client' && (
+                      <span className="text-green-600 dark:text-green-400 font-medium">
+                        📄 Content Only
+                      </span>
+                    )}
+                    {cursorRegion === 'title-bar' && (
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">
+                        🖼️ Full Window
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-blue-600 dark:text-blue-400 font-medium">
                     Click to capture
-                  </span>
+                  </div>
                 </div>
               </div>
             </div>

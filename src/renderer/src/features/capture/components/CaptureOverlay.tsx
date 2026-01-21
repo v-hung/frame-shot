@@ -14,11 +14,11 @@ import * as logger from '@renderer/utils/logger.utils'
 interface WindowInfo {
   hwnd: number
   title: string
-  x: number
-  y: number
-  width: number
-  height: number
-  zIndex: number
+  processName: string
+  windowBounds: { x: number; y: number; width: number; height: number } // Full window including title bar
+  clientBounds: { x: number; y: number; width: number; height: number } // Content area only
+  titleBarBounds: { x: number; y: number; width: number; height: number } // Title bar area
+  isVisible: boolean
 }
 
 export function CaptureOverlay() {
@@ -45,6 +45,7 @@ export function CaptureOverlay() {
         if (windowsResult.success && windowsResult.data) {
           setAvailableWindows(windowsResult.data.windows)
         }
+        // logger.log('[CaptureOverlay] Loaded windows:', windowsResult.data?.windows)
       } catch (error) {
         logger.error('[CaptureOverlay] Failed to fetch windows:', error)
       }

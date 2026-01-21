@@ -19,8 +19,6 @@ const captureAPI = {
 
 // Window Picker API for native window detection
 const windowPickerAPI = {
-  getAtCursor: () => ipcRenderer.invoke('window-picker:get-at-cursor'),
-
   listAll: () => ipcRenderer.invoke('window-picker:list-all')
 }
 

@@ -72,14 +72,14 @@ function createCaptureWindow(): void {
     maxX = Math.max(maxX, x + width)
     maxY = Math.max(maxY, y + height)
 
-    console.log(
-      '[Main] Display:',
-      display.id,
-      'bounds:',
-      display.bounds,
-      'workArea:',
-      display.workArea
-    )
+    // console.log(
+    //   '[Main] Display:',
+    //   display.id,
+    //   'bounds:',
+    //   display.bounds,
+    //   'workArea:',
+    //   display.workArea
+    // )
   })
 
   const captureBounds = {
@@ -89,8 +89,8 @@ function createCaptureWindow(): void {
     height: maxY - minY
   }
 
-  console.log('[Main] Creating capture window, bounds:', captureBounds)
-  console.log('[Main] Total displays:', allDisplays.length)
+  // console.log('[Main] Creating capture window, bounds:', captureBounds)
+  // console.log('[Main] Total displays:', allDisplays.length)
 
   // Create capture window
   captureWindow = new BrowserWindow({
@@ -149,12 +149,12 @@ function createCaptureWindow(): void {
     captureWindow.show()
     captureWindow.focus()
 
-    console.log('[Main] Capture window shown and focused')
+    // console.log('[Main] Capture window shown and focused')
   })
 
   captureWindow.on('closed', () => {
     captureWindow = null
-    console.log('[Main] Capture window closed')
+    // console.log('[Main] Capture window closed')
   })
 
   // Open DevTools for debugging (optional)
@@ -166,7 +166,7 @@ function createCaptureWindow(): void {
  * Only region mode needs UI overlay, others execute directly
  */
 function startCaptureMode(mode: string): void {
-  console.log('[Main] Starting capture mode:', mode)
+  // console.log('[Main] Starting capture mode:', mode)
 
   if (mode === 'region') {
     // Region mode needs overlay UI
@@ -207,7 +207,7 @@ async function executeDirectCapture(mode: 'fullscreen' | 'window'): Promise<void
  * Exit capture mode - close capture window
  */
 function exitCaptureMode(): void {
-  console.log('[Main] Exiting capture mode')
+  // console.log('[Main] Exiting capture mode')
 
   if (captureWindow && !captureWindow.isDestroyed()) {
     captureWindow.close()

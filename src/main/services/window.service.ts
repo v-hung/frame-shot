@@ -36,7 +36,10 @@ export class WindowService {
       .map((source) => ({
         id: source.id,
         name: source.name,
-        bounds: { x: 0, y: 0, width: 0, height: 0 }, // Will be populated when needed
+        bounds: { x: 0, y: 0, width: 0, height: 0 }, // Deprecated: use windowBounds
+        windowBounds: { x: 0, y: 0, width: 0, height: 0 }, // Will be populated when needed
+        clientBounds: { x: 0, y: 0, width: 0, height: 0 }, // Will be populated when needed
+        titleBarBounds: { x: 0, y: 0, width: 0, height: 0 }, // Will be populated when needed
         thumbnail: source.thumbnail.toDataURL(), // Convert to base64
         appName: this.extractAppName(source.name),
         isVisible: source.name !== ''

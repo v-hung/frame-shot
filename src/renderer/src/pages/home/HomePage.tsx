@@ -1,5 +1,3 @@
-import { Link } from 'react-router'
-
 export function Component() {
   return (
     <div className="w-full h-full p-8 bg-gray-50">
@@ -17,20 +15,6 @@ export function Component() {
             </li>
             <li>
               <kbd className="px-2 py-1 bg-gray-100 rounded">Ctrl+Shift+3</kbd> - Window Capture
-            </li>
-          </ul>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-2">Test Pages</h2>
-          <ul className="space-y-2">
-            <li>
-              <Link
-                to="/window-picker"
-                className="text-blue-500 hover:text-blue-600 hover:underline"
-              >
-                → Window Picker Test (Native C++)
-              </Link>
             </li>
           </ul>
         </div>

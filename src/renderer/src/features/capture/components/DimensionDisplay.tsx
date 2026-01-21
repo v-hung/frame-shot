@@ -18,7 +18,7 @@ export function DimensionDisplay({ width, height, x, y }: DimensionDisplayProps)
 
   return (
     <div
-      className="absolute px-2 py-1 bg-black/80 text-white text-xs font-mono rounded whitespace-nowrap pointer-events-none z-[3]"
+      className="absolute px-2 py-1 bg-black/80 text-white text-xs font-mono rounded whitespace-nowrap pointer-events-none z-3"
       style={{
         left: `${displayX}px`,
         top: `${displayY}px`

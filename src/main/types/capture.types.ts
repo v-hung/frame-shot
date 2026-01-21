@@ -17,7 +17,10 @@ export interface CaptureRegion {
 export interface CaptureWindow {
   id: string
   name: string
-  bounds: { x: number; y: number; width: number; height: number }
+  bounds: { x: number; y: number; width: number; height: number } // Deprecated: use windowBounds
+  windowBounds: { x: number; y: number; width: number; height: number } // Full window including title bar
+  clientBounds: { x: number; y: number; width: number; height: number } // Content area (browsers: web content only; apps: client area)
+  titleBarBounds: { x: number; y: number; width: number; height: number } // Title bar area
   thumbnail: string // Base64 PNG
   appName: string
   isVisible: boolean
